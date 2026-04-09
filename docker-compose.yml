@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: toloka
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d toloka"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  electric:
+    image: electricsql/electric:latest
+    environment:
+      DATABASE_URL: postgresql://electric_user:electric_password@postgres:5432/toloka?sslmode=disable
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_MANUAL_TABLE_PUBLISHING: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    image: python:3.13-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install --no-cache-dir -e . &&
+             python -m toloka_torznab.main"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/toloka
+      CREATE_ELECTRIC_PUBLICATION: "1"
+      ELECTRIC_USER_PASSWORD: "electric_password"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Kyiv
+    ports:
+      - "8989:8989"
+    volumes:
+      - sonarr_data:/config
+
+volumes:
+  postgres_data:
+  sonarr_data:
