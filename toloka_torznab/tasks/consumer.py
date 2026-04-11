@@ -93,16 +93,7 @@ class ElectricConsumerTask(AbstractTask):
                 type(exc).__name__,
                 exc,
             )
-            await asyncio.sleep(5)
-            return
-
-        if response.status_code >= 500:
-            logger.warning(
-                "Electric returned %d for %s, retrying",
-                response.status_code,
-                self.shape_name,
-            )
-            await asyncio.sleep(5)
+            await asyncio.sleep(60)
             return
 
         if response.status_code == 400:

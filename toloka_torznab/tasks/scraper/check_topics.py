@@ -14,11 +14,11 @@ class RefreshTopicsTask(AbstractTask):
         self.engine = engine
 
     async def run_once(self):
-        logger.info("RefreshTopicsTask: waiting before full category refresh")
-        for _ in range(10 * 60 * 60):
-            if not self.running:
-                return
-            await asyncio.sleep(1)
+        # logger.info("RefreshTopicsTask: waiting before full category refresh")
+        # for _ in range(10 * 60 * 60):
+        #     if not self.running:
+        #         return
+        #     await asyncio.sleep(1)
 
         logger.info(
             "RefreshTopicsTask: starting full refresh of %d categories",
