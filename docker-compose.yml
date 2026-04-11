@@ -39,10 +39,6 @@ services:
              python -m toloka_torznab.main"
     env_file:
       - .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/toloka
-      CREATE_ELECTRIC_PUBLICATION: "1"
-      ELECTRIC_USER_PASSWORD: "electric_password"
     volumes:
       - .:/app
     ports:
