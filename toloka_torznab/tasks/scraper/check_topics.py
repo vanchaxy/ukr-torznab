@@ -1,7 +1,10 @@
 import asyncio
 import logging
 
+import sqlalchemy as sa
+
 from toloka_torznab.db.queries import upsert_topic
+from toloka_torznab.db.tables import topic as topic_table
 from toloka_torznab.settings import TOLOKA_CATEGORIES
 from toloka_torznab.tasks.base import AbstractTask
 
@@ -14,11 +17,21 @@ class RefreshTopicsTask(AbstractTask):
         self.engine = engine
 
     async def run_once(self):
-        logger.info("RefreshTopicsTask: waiting before full category refresh")
-        for _ in range(10 * 60 * 60):
-            if not self.running:
-                return
-            await asyncio.sleep(1)
+        async with self.engine.connect() as conn:
+            topic_count = (
+                await conn.execute(sa.select(sa.func.count()).select_from(topic_table))
+            ).scalar()
+        if topic_count and topic_count >= 30_000:
+            logger.info("RefreshTopicsTask: waiting before full category refresh")
+            for _ in range(10 * 60 * 60):
+                if not self.running:
+                    return
+                await asyncio.sleep(1)
+        else:
+            logger.info(
+                "RefreshTopicsTask: only %d topics in DB, refreshing immediately",
+                topic_count or 0,
+            )
 
         logger.info(
             "RefreshTopicsTask: starting full refresh of %d categories",
