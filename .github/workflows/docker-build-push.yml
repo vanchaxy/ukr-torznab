@@ -2,7 +2,7 @@ name: Docker Build and Push
 
 on:
   push:
-    branches: ["main"]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:
@@ -31,6 +31,22 @@ jobs:
         run: |
           VERSION=$(grep -Po '__version__\s*=\s*"\K[^"]+' toloka_torznab/__init__.py)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version against branch
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$VERSION" =~ rc ]]; then
+            if [[ "$BRANCH" == "main" ]]; then
+              echo "::error::rc version '$VERSION' is not allowed on main"
+              exit 1
+            fi
+          else
+            if [[ "$BRANCH" != "main" ]]; then
+              echo "::error::non-rc version '$VERSION' is only allowed on main (branch: $BRANCH)"
+              exit 1
+            fi
+          fi
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
