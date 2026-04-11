@@ -136,6 +136,7 @@ def upgrade() -> None:
         )
         conn.execute(sa.text(f"GRANT {_ROLE} TO CURRENT_USER"))
         conn.execute(sa.text(f'GRANT CONNECT ON DATABASE "{db_name}" TO {_ROLE}'))
+        conn.execute(sa.text(f'GRANT CREATE ON DATABASE "{db_name}" TO {_ROLE}'))
         conn.execute(sa.text(f"GRANT USAGE ON SCHEMA public TO {_ROLE}"))
         for table in _ELECTRIC_TABLES:
             conn.execute(sa.text(f"GRANT SELECT ON {table} TO {_ROLE}"))
