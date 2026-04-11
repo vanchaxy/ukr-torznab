@@ -17,12 +17,23 @@ logger = logging.getLogger(__name__)
 
 
 def _coerce_row(table: sa.Table, row: dict) -> dict:
-    """Coerce Electric JSON values to Python types expected by SQLAlchemy."""
+    """Coerce Electric JSON values to Python types expected by SQLAlchemy.
+
+    Only includes columns that are actually present in *row* — Electric sends
+    partial payloads on update operations.
+    """
     result = {}
     for col in table.columns:
-        val = row.get(col.name)
+        if col.name not in row:
+            continue
+        val = row[col.name]
         if val is None:
             result[col.name] = None
+        elif isinstance(col.type, sa.Boolean):
+            if isinstance(val, bool):
+                result[col.name] = val
+            else:
+                result[col.name] = str(val).lower() in ("t", "true", "1")
         elif isinstance(col.type, sa.Date):
             result[col.name] = date.fromisoformat(val)
         elif isinstance(col.type, sa.DateTime):
@@ -73,10 +84,25 @@ class ElectricConsumerTask(AbstractTask):
             response = await self.client.get(
                 f"{self.electric_url}/v1/shape",
                 params=params,
+                timeout=60.0,
             )
         except httpx.RequestError as exc:
-            logger.warning("Electric request failed for %s: %s", self.shape_name, exc)
-            await asyncio.sleep(60 * 5)
+            logger.warning(
+                "Electric request failed for %s: %s: %s",
+                self.shape_name,
+                type(exc).__name__,
+                exc,
+            )
+            await asyncio.sleep(5)
+            return
+
+        if response.status_code >= 500:
+            logger.warning(
+                "Electric returned %d for %s, retrying",
+                response.status_code,
+                self.shape_name,
+            )
+            await asyncio.sleep(5)
             return
 
         if response.status_code == 400:
@@ -93,27 +119,28 @@ class ElectricConsumerTask(AbstractTask):
         response.raise_for_status()
 
         new_handle = response.headers.get("electric-handle", current_handle)
+        new_offset = response.headers.get("electric-offset", current_offset)
         messages: list[dict] = response.json()
 
         pk_col = _pk_col(self.table)
         ops: list[tuple[str, object]] = []
 
         for msg in messages:
-            if msg.get("offset"):
-                current_offset = msg["offset"]
             op_headers = msg.get("headers", {})
             if "control" in op_headers:
                 continue
             operation = op_headers.get("operation")
             value = msg.get("value", {})
-            if operation in ("insert", "update"):
-                ops.append(("upsert", _coerce_row(self.table, value)))
+            if operation == "insert":
+                ops.append(("insert", _coerce_row(self.table, value)))
+            elif operation == "update":
+                ops.append(("update", _coerce_row(self.table, value)))
             elif operation == "delete":
                 ops.append(("delete", value.get(pk_col.name)))
 
         async with self.engine.begin() as conn:
             for op_type, op_data in ops:
-                if op_type == "upsert":
+                if op_type == "insert":
                     row_data = op_data
                     await conn.execute(
                         upsert(self.table, conn)
@@ -123,12 +150,22 @@ class ElectricConsumerTask(AbstractTask):
                             set_={k: v for k, v in row_data.items() if k != pk_col.name},
                         ),
                     )
+                elif op_type == "update":
+                    row_data = op_data
+                    pk_val = row_data.get(pk_col.name)
+                    update_data = {k: v for k, v in row_data.items() if k != pk_col.name}
+                    if pk_val is not None and update_data:
+                        await conn.execute(
+                            self.table.update()
+                            .where(pk_col == pk_val)
+                            .values(update_data),
+                        )
                 else:
                     pk_val = op_data
                     if pk_val is not None:
                         await conn.execute(delete(self.table).where(pk_col == pk_val))
 
-            offset_values = {"handle": new_handle, "offset": current_offset}
+            offset_values = {"handle": new_handle, "offset": new_offset}
             await conn.execute(
                 upsert(electric_offset, conn)
                 .values({"shape_name": self.shape_name, **offset_values})

@@ -63,3 +63,9 @@ class CheckNewTopicsTask(AbstractTask):
                 async with self.engine.begin() as conn:
                     for topic in topics:
                         await upsert_topic(conn, topic_data=topic, category=category)
+
+        logger.info("CheckNewTopicsTask: waiting")
+        for _ in range(10 * 60):
+            if not self.running:
+                return
+            await asyncio.sleep(1)

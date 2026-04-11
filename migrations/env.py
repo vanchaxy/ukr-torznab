@@ -5,10 +5,9 @@ cfg = context.config
 
 
 def run_migrations() -> None:
-    engine = create_engine(
-        cfg.get_main_option("sqlalchemy.url"),
-        poolclass=pool.NullPool,
-    )
+    url_str = cfg.get_main_option("sqlalchemy.url")
+
+    engine = create_engine(url_str, poolclass=pool.NullPool)
 
     with engine.connect() as conn:
         context.configure(connection=conn, target_metadata=None)

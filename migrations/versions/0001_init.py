@@ -125,7 +125,7 @@ def upgrade() -> None:
     if os.environ.get("CREATE_ELECTRIC_PUBLICATION"):
         if conn.dialect.name != "postgresql":
             raise RuntimeError(
-                "CREATE_ELECTRIC_PUBLICATION is set but the database is not PostgreSQL"
+                "CREATE_ELECTRIC_PUBLICATION is set but the database is not PostgreSQL",
             )
         password = os.environ["ELECTRIC_USER_PASSWORD"]
         db_name = conn.execute(sa.text("SELECT current_database()")).scalar()
