@@ -45,6 +45,22 @@ class RefreshImdbTask(AbstractTask):
         self.engine = engine
 
     async def run_once(self):
+        async with self.engine.connect() as conn:
+            existing_rows = (
+                await conn.execute(sa.select(sa.func.count()).select_from(_imdb_titles_main))
+            ).scalar()
+        if existing_rows:
+            logger.info(
+                "RefreshImdbTask: waiting %dh before next refresh",
+                REFRESH_INTERVAL // 3600,
+            )
+            for _ in range(REFRESH_INTERVAL):
+                if not self.running:
+                    return
+                await asyncio.sleep(1)
+        else:
+            logger.info("RefreshImdbTask: imdb_titles is empty, refreshing immediately")
+
         start = time.time()
         logger.info("RefreshImdbTask: dropping stale tmp/old tables")
         async with self.engine.begin() as conn:
@@ -132,12 +148,6 @@ class RefreshImdbTask(AbstractTask):
                 await conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE);")
 
         logger.info("RefreshImdbTask: refresh complete (%.1fs)", time.time() - start)
-
-        logger.info("RefreshImdbTask: waiting %dh before next refresh", REFRESH_INTERVAL // 3600)
-        for _ in range(REFRESH_INTERVAL):
-            if not self.running:
-                return
-            await asyncio.sleep(1)
 
     @staticmethod
     def parse_row(fields: list[str]):

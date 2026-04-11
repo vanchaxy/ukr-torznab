@@ -27,7 +27,7 @@ from toloka_torznab.clients.skyhook import SkyhookClient
 from toloka_torznab.db.enums import AudioType, ContentType, Lang, SkipReason
 from toloka_torznab.db.tables import imdb_titles as imdb_titles_table
 
-from .episodes import match_episodes
+from .episodes import match_episodes, match_episodes_llm
 from .imdb import extract_imdb_multi
 from .metadata import (
     detect_audio_sources,
