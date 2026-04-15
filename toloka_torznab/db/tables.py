@@ -52,6 +52,11 @@ release = sa.Table(
     sa.Column("subtitle_lang", sa.Text, nullable=True),  # JSON list of Lang.value
     sa.Column("author", sa.Text, nullable=True),
     sa.Column("release_group", sa.Text, nullable=True),
+    sa.Column("hdr", sa.Text, nullable=True),  # VideoFormat.value
+    sa.Column("cut", sa.Text, nullable=True),
+    sa.Column("ratio", sa.Text, nullable=True),  # AspectRatio.value
+    sa.Column("hybrid", sa.Boolean, nullable=True),
+    sa.Column("parser_version", sa.Integer, nullable=True),
 )
 
 page = sa.Table(

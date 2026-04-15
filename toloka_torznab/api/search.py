@@ -64,7 +64,7 @@ def build_rss(rows, base_url: str) -> Response:
         comments_el = etree.SubElement(item, "comments")
         comments_el.text = f"https://toloka.to/t{row.id}"
 
-        dt = row.updated_at
+        dt = row.hash_changed_at
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
         pub = etree.SubElement(item, "pubDate")
@@ -96,6 +96,9 @@ def build_rss(rows, base_url: str) -> Response:
                 torznab_attr(item, "tvdbid", str(row.tvdb_id))
             if row.season is not None:
                 torznab_attr(item, "season", str(row.season))
+        elif row.content_type == "movie":
+            if row.tmdb_id:
+                torznab_attr(item, "tmdbid", str(row.tmdb_id))
         if row.quality:
             torznab_attr(item, "quality", row.quality)
         if row.resolution:

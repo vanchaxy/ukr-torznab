@@ -96,12 +96,14 @@ class ElectricConsumerTask(AbstractTask):
             await asyncio.sleep(60)
             return
 
-        if response.status_code == 400:
+        if response.status_code in (400, 409):
             logger.warning(
-                "Electric returned 400 for %s (handle invalidated), resetting offset",
+                "Electric returned %d for %s (handle invalidated), resetting shape",
+                response.status_code,
                 self.shape_name,
             )
             async with self.engine.begin() as conn:
+                await conn.execute(delete(self.table))
                 await conn.execute(
                     delete(electric_offset).where(electric_offset.c.shape_name == self.shape_name),
                 )

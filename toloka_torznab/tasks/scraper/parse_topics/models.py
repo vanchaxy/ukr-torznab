@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from toloka_torznab.db.enums import (
+    AspectRatio,
     AudioSource,
     AudioType,
     CodecFamily,
@@ -12,6 +13,7 @@ from toloka_torznab.db.enums import (
     Quality,
     Resolution,
     SkipReason,
+    VideoFormat,
 )
 
 
@@ -53,6 +55,10 @@ class ParsedPage:
     audio_sources: set[AudioSource] = field(default_factory=set)
     audio_lang: set[Lang] = field(default_factory=set)
     subtitle_lang: set[Lang] = field(default_factory=set)
+    hdr: VideoFormat = VideoFormat.SDR
+    cut: str | None = None
+    ratio: AspectRatio = AspectRatio.STANDARD
+    hybrid: bool = False
 
     # Authorship / release
     author: str | None = None

@@ -22,6 +22,7 @@ async def torznab_api(
     cat: str | None = None,
     imdbid: str | None = None,
     tvdbid: str | None = None,
+    tmdbid: str | None = None,
     season: int | None = None,
     ep: int | None = None,
     offset: int = 0,
@@ -43,6 +44,7 @@ async def torznab_api(
     )
     parsed_imdbid = parse_imdbid(imdbid)
     parsed_tvdbid = int(tvdbid) if tvdbid and tvdbid.isdigit() else None
+    parsed_tmdbid = int(tmdbid) if tmdbid and tmdbid.isdigit() else None
 
     engine: AsyncEngine = request.app.state.engine
     async with engine.connect() as conn:
@@ -52,6 +54,7 @@ async def torznab_api(
             content_types=content_types,
             imdb_id=parsed_imdbid,
             tvdb_id=parsed_tvdbid,
+            tmdb_id=parsed_tmdbid,
             season=season,
             episode=ep,
             offset=offset,

@@ -28,6 +28,7 @@ from toloka_torznab.db.enums import AudioType, ContentType, Lang, SkipReason
 from toloka_torznab.db.tables import imdb_titles as imdb_titles_table
 
 from .episodes import match_episodes, match_episodes_llm
+from .extras import detect_cut, detect_hdr, detect_hybrid, detect_ratio
 from .imdb import extract_imdb_multi
 from .metadata import (
     detect_audio_sources,
@@ -331,6 +332,10 @@ async def process_single_page(
         release_group=release_group,
         torrent_size=torrent_size,
         infohash_sha256=infohash_sha256,
+        hdr=detect_hdr(text),
+        cut=detect_cut(name),
+        ratio=detect_ratio(name),
+        hybrid=detect_hybrid(name),
     )
     page.content_hash = _content_hash(page)
     return page

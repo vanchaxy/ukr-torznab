@@ -18,9 +18,9 @@ def caps_response() -> Response:
 
     searching = etree.SubElement(caps, "searching")
     for tag, params in (
-        ("search", "q,cat,imdbid"),
+        ("search", "q,cat,imdbid,tmdbid"),
         ("tv-search", "q,cat,tvdbid,imdbid,season,ep"),
-        ("movie-search", "q,cat,imdbid"),
+        ("movie-search", "q,cat,imdbid,tmdbid"),
     ):
         el = etree.SubElement(searching, tag)
         el.set("available", "yes")

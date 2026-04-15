@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from toloka_torznab.db.tables import page, release, topic
 from toloka_torznab.db.upsert import upsert
 
+PARSER_VERSION = 2
+
 
 def _topic_hash(name, size, download_id, added_on, updated_at) -> str:
     h = hashlib.sha256()
@@ -130,6 +132,7 @@ async def get_page_to_parse(conn: AsyncConnection):
             or_(
                 release.c.id == None,
                 page.c.downloaded_at > release.c.parsed_at,
+                release.c.parser_version < PARSER_VERSION,
             ),
         )
         .limit(500)
@@ -169,6 +172,7 @@ async def search_releases(
     content_types: list[str] | None = None,
     imdb_id: int | None = None,
     tvdb_id: int | None = None,
+    tmdb_id: int | None = None,
     season: int | None = None,
     episode: int | None = None,
     offset: int = 0,
@@ -185,6 +189,7 @@ async def search_releases(
             release.c.content_type,
             release.c.imdb_id,
             release.c.tvdb_id,
+            release.c.tmdb_id,
             release.c.title,
             release.c.year,
             release.c.season,
@@ -219,6 +224,8 @@ async def search_releases(
         query = query.where(release.c.imdb_id == imdb_id)
     if tvdb_id is not None:
         query = query.where(release.c.tvdb_id == tvdb_id)
+    if tmdb_id is not None:
+        query = query.where(release.c.tmdb_id == tmdb_id)
     if episode is not None:
         query = query.where(
             release.c.file_to_episode.is_not(None),
@@ -287,6 +294,11 @@ async def upsert_release(
             content_hash=p.content_hash,
             infohash_sha256=p.infohash_sha256,
             last_episode=p.last_episode,
+            hdr=p.hdr.value,
+            cut=p.cut,
+            ratio=p.ratio.value,
+            hybrid=p.hybrid,
+            parser_version=PARSER_VERSION,
         )
     query = (
         upsert(release, conn)
