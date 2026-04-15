@@ -261,6 +261,7 @@ async def upsert_release(
         "result": result,
         "parsed_at": parsed_at,
         "hash_changed_at": hash_changed_at,
+        "parser_version": PARSER_VERSION,
     }
     if parsed_page is not None:
         p = parsed_page
@@ -298,7 +299,6 @@ async def upsert_release(
             cut=p.cut,
             ratio=p.ratio.value,
             hybrid=p.hybrid,
-            parser_version=PARSER_VERSION,
         )
     query = (
         upsert(release, conn)
