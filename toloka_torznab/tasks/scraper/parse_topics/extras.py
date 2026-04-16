@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from toloka_torznab.db.enums import AspectRatio, VideoFormat
+from toloka_torznab.enums import AspectRatio, VideoFormat
 
 _HDR_ROW_RE = re.compile(
     r"(?:hdr.format|формат.hdr|commercial.name|комерційна.назва"
@@ -81,7 +81,7 @@ def detect_cut(name: str) -> str | None:
 
 
 def detect_ratio(name: str) -> AspectRatio:
-    if 'IMAX' in name or 'Imax' in name:
+    if "IMAX" in name or "Imax" in name:
         return AspectRatio.IMAX
     if "open matte" in name.lower():
         return AspectRatio.OPEN_MATTE

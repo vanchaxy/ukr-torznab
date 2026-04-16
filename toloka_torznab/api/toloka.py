@@ -1,6 +1,6 @@
-"""Torznab API route handlers."""
+"""Toloka Torznab API route handlers."""
 
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -10,8 +10,7 @@ from .caps import caps_response
 from .search import build_rss, content_type_filter, parse_imdbid
 from .xml import _CT_TORRENT, _DEFAULT_LIMIT, _MAX_LIMIT, error_xml
 
-router = APIRouter()
-app = FastAPI()
+router = APIRouter(prefix="/toloka")
 
 
 @router.get("/api")
@@ -29,7 +28,7 @@ async def torznab_api(
     limit: int = _DEFAULT_LIMIT,
 ) -> Response:
     if t == "caps":
-        return caps_response()
+        return caps_response("Toloka Torznab")
 
     if t not in ("search", "tvsearch", "movie"):
         return error_xml(202, "No such function")
@@ -76,6 +75,3 @@ async def download_torrent(request: Request, download_id: int) -> Response:
         media_type=_CT_TORRENT,
         headers={"Content-Disposition": f'attachment; filename="{download_id}.torrent"'},
     )
-
-
-app.include_router(router)

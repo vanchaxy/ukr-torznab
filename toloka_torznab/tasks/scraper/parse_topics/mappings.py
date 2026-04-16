@@ -5,7 +5,7 @@ They live here (not in db/enums) because they are scraper-specific knowledge
 about how the tracker encodes information — not a property of the DB schema.
 """
 
-from toloka_torznab.db.enums import (
+from toloka_torznab.enums import (
     AudioSource,
     AudioType,
     CodecFamily,

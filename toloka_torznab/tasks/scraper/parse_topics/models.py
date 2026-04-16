@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
-from toloka_torznab.db.enums import (
+from toloka_torznab.enums import (
     AspectRatio,
     AudioSource,
     AudioType,
@@ -36,6 +37,7 @@ class ParsedPage:
     name: str
     content_type: ContentType
     video_files: list[Path]
+    registered_at: datetime  # UTC
 
     # Movie-specific
     tmdb_id: int | None = None
@@ -68,6 +70,8 @@ class ParsedPage:
 
     torrent_size: int | None = None  # total size in bytes from lt.torrent_info
     infohash_sha256: str | None = None  # sha256 of torrent infohash bytes
+
+    acodec: str | None = None
 
     # Change detection
     content_hash: str | None = None  # sha256 of all other fields

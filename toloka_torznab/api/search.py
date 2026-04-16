@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import UTC
+from datetime import UTC, datetime
 from email.utils import format_datetime
+from types import SimpleNamespace
 
 from fastapi.responses import Response
 from lxml import etree
@@ -64,7 +65,7 @@ def build_rss(rows, base_url: str) -> Response:
         comments_el = etree.SubElement(item, "comments")
         comments_el.text = f"https://toloka.to/t{row.id}"
 
-        dt = row.hash_changed_at
+        dt = row.registered_at
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC)
         pub = etree.SubElement(item, "pubDate")
@@ -103,5 +104,78 @@ def build_rss(rows, base_url: str) -> Response:
             torznab_attr(item, "quality", row.quality)
         if row.resolution:
             torznab_attr(item, "resolution", row.resolution)
+
+    return xml_response(rss, _CT_RSS)
+
+
+def build_utp_rss(items: list[dict], base_url: str) -> Response:
+    """Build Torznab RSS feed from transformed UTP items."""
+    from .xml import _TORZNAB_NS
+
+    rss = etree.Element("rss", nsmap={"torznab": _TORZNAB_NS})
+    rss.set("version", "2.0")
+    channel = etree.SubElement(rss, "channel")
+
+    title_el = etree.SubElement(channel, "title")
+    title_el.text = "UTP Torznab"
+
+    for item in items:
+        row = SimpleNamespace(**item)
+        el = etree.SubElement(channel, "item")
+
+        t = etree.SubElement(el, "title")
+        t.text = release_name(row)
+
+        guid_el = etree.SubElement(el, "guid")
+        guid_el.set("isPermaLink", "false")
+        guid_el.text = f"utp-{item['id']}"
+
+        if item.get("details_link"):
+            comments_el = etree.SubElement(el, "comments")
+            comments_el.text = item["details_link"]
+
+        if item.get("created_at"):
+            try:
+                dt = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                pub = etree.SubElement(el, "pubDate")
+                pub.text = format_datetime(dt)
+            except (ValueError, AttributeError):
+                pass
+
+        cat_id = _CAT_TV if item["content_type"] == "tv" else _CAT_MOVIE
+        cat_el = etree.SubElement(el, "category")
+        cat_el.text = cat_id
+
+        size = item.get("size") or 0
+        size_el = etree.SubElement(el, "size")
+        size_el.text = str(size)
+
+        enc = etree.SubElement(el, "enclosure")
+        enc.set("url", item["download_link"])
+        enc.set("length", str(size))
+        enc.set("type", _CT_TORRENT)
+
+        torznab_attr(el, "seeders", str(item.get("seeders", 0)))
+        torznab_attr(el, "leechers", str(item.get("leechers", 0)))
+        torznab_attr(el, "peers", str(item.get("seeders", 0) + item.get("leechers", 0)))
+
+        if item.get("info_hash"):
+            torznab_attr(el, "infohash", item["info_hash"])
+        if item.get("imdb_id"):
+            torznab_attr(el, "imdbid", f"tt{item['imdb_id']:07d}")
+        if item["content_type"] == "tv":
+            if item.get("tvdb_id"):
+                torznab_attr(el, "tvdbid", str(item["tvdb_id"]))
+            if item.get("season") is not None:
+                torznab_attr(el, "season", str(item["season"]))
+        elif item["content_type"] == "movie":
+            if item.get("tmdb_id"):
+                torznab_attr(el, "tmdbid", str(item["tmdb_id"]))
+        if item.get("quality"):
+            torznab_attr(el, "quality", item["quality"])
+        if item.get("resolution"):
+            torznab_attr(el, "resolution", item["resolution"])
 
     return xml_response(rss, _CT_RSS)

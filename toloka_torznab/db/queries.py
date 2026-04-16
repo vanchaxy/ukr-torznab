@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from toloka_torznab.db.tables import page, release, topic
 from toloka_torznab.db.upsert import upsert
 
-PARSER_VERSION = 2
+PARSER_VERSION = 3
 
 
 def _topic_hash(name, size, download_id, added_on, updated_at) -> str:
@@ -153,7 +153,7 @@ def _file_to_episode_matches(conn, season: int | None, episode: int | None):
         s_expr = sa.cast(fte.c.value.op("->>")(literal(0)), sa.Integer)
         e_expr = sa.cast(fte.c.value.op("->>")(literal(1)), sa.Integer)
     else:
-        fte = func.json_each(col).table_valued("key", "value").render_derived(name="fte")
+        fte = func.json_each(col).table_valued("key", "value")
         s_expr = func.json_extract(fte.c.value, "$[0]")
         e_expr = func.json_extract(fte.c.value, "$[1]")
 
@@ -185,7 +185,6 @@ async def search_releases(
             topic.c.name,
             topic.c.seeders,
             topic.c.leechers,
-            topic.c.updated_at,
             release.c.content_type,
             release.c.imdb_id,
             release.c.tvdb_id,
@@ -206,6 +205,8 @@ async def search_releases(
             release.c.subtitle_lang,
             release.c.release_group,
             release.c.author,
+            release.c.hash_changed_at,
+            release.c.registered_at,
         )
         .join(release, topic.c.id == release.c.id)
         .where(release.c.result == "ok")
@@ -244,7 +245,7 @@ async def search_releases(
                 ),
             ),
         )
-    query = query.order_by(topic.c.updated_at.desc()).offset(offset).limit(limit)
+    query = query.order_by(release.c.registered_at.desc()).offset(offset).limit(limit)
     return (await conn.execute(query)).fetchall()
 
 
@@ -299,6 +300,8 @@ async def upsert_release(
             cut=p.cut,
             ratio=p.ratio.value,
             hybrid=p.hybrid,
+            acodec=p.acodec,
+            registered_at=p.registered_at,
         )
     query = (
         upsert(release, conn)

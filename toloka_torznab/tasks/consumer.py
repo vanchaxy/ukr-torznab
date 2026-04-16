@@ -107,7 +107,7 @@ class ElectricConsumerTask(AbstractTask):
                 await conn.execute(
                     delete(electric_offset).where(electric_offset.c.shape_name == self.shape_name),
                 )
-            return
+            exit()
 
         response.raise_for_status()
 
@@ -149,9 +149,7 @@ class ElectricConsumerTask(AbstractTask):
                     update_data = {k: v for k, v in row_data.items() if k != pk_col.name}
                     if pk_val is not None and update_data:
                         await conn.execute(
-                            self.table.update()
-                            .where(pk_col == pk_val)
-                            .values(update_data),
+                            self.table.update().where(pk_col == pk_val).values(update_data),
                         )
                 else:
                     pk_val = op_data

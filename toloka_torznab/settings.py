@@ -5,6 +5,8 @@ ALEMBIC_DATABASE_URL: str = DATABASE_URL.replace("+aiosqlite", "").replace("+asy
 
 OPENAI_API_KEY: str | None = os.environ.get("OPENAI_API_KEY")
 
+UTP_API_KEY: str | None = os.environ.get("UTP_API_KEY")
+
 ELECTRIC_URL: str | None = os.environ.get("ELECTRIC_URL")
 
 API_PORT: int = int(os.environ.get("API_PORT", "8000"))

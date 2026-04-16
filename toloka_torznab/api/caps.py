@@ -6,11 +6,11 @@ from lxml import etree
 from .xml import _CAT_MOVIE, _CAT_TV, _DEFAULT_LIMIT, _MAX_LIMIT, xml_response
 
 
-def caps_response() -> Response:
+def caps_response(title: str = "Toloka Torznab") -> Response:
     caps = etree.Element("caps")
 
     server = etree.SubElement(caps, "server")
-    server.set("title", "Toloka Torznab")
+    server.set("title", title)
 
     limits = etree.SubElement(caps, "limits")
     limits.set("max", str(_MAX_LIMIT))

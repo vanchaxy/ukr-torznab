@@ -4,7 +4,7 @@ import re
 
 from decancer_py import parse as decancer_parse
 
-from toloka_torznab.db.enums import AudioSource, AudioType, CodecFamily, Lang, Quality, Resolution
+from toloka_torznab.enums import AudioSource, AudioType, CodecFamily, Lang, Quality, Resolution
 
 from .mappings import (
     AUDIO_SOURCE_MAP,

@@ -12,7 +12,9 @@ import hashlib
 import html as html_mod
 import logging
 import re
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import html2text
 import libtorrent as lt
@@ -24,8 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from toloka_torznab.clients.servarr import ServarrClient
 from toloka_torznab.clients.skyhook import SkyhookClient
-from toloka_torznab.db.enums import AudioType, ContentType, Lang, SkipReason
 from toloka_torznab.db.tables import imdb_titles as imdb_titles_table
+from toloka_torznab.enums import AudioType, ContentType, Lang, SkipReason
 
 from .episodes import match_episodes, match_episodes_llm
 from .extras import detect_cut, detect_hdr, detect_hybrid, detect_ratio
@@ -152,6 +154,22 @@ async def process_single_page(
 
     # 1. Parse HTML structure
     dom_full = etree.HTML(page.html)
+
+    raw_reg = (
+        dom_full.xpath(
+            "normalize-space(//tr[@class='row4_to' and td[contains(., 'Зареєстрований:')]]/td[2])",
+        )
+        .replace("\xa0", "")
+        .strip()
+    )
+    if raw_reg:
+        kyiv_dt = datetime.strptime(raw_reg, "%Y-%m-%d %H:%M").replace(
+            tzinfo=ZoneInfo("Europe/Kyiv"),
+        )
+        registered_at = kyiv_dt.astimezone(UTC)
+    else:
+        registered_at = datetime(1970, 1, 1, tzinfo=UTC)
+
     dom_list = dom_full.xpath(
         '//table[@class="forumline"]/tr[.//div[@class="files-wrap"]]',
     )
@@ -314,6 +332,7 @@ async def process_single_page(
         name=name,
         content_type=content_type,
         video_files=video_files,
+        registered_at=registered_at,
         season=int(season) if season is not None else None,
         tvdb_id=skyhook.get("tvdbId") if skyhook else None,
         tmdb_id=servarr.get("TmdbId") if servarr else None,

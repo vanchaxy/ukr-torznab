@@ -16,6 +16,7 @@ from toloka_torznab.clients.qbittorrent import QBittorrentClient
 from toloka_torznab.clients.servarr import ServarrClient
 from toloka_torznab.clients.skyhook import SkyhookClient
 from toloka_torznab.clients.toloka import TolokaClient
+from toloka_torznab.clients.utp import UtpClient
 from toloka_torznab.db.tables import release, topic
 from toloka_torznab.settings import (
     ALEMBIC_DATABASE_URL,
@@ -28,6 +29,7 @@ from toloka_torznab.settings import (
     QBITTORRENT_USERNAME,
     TOLOKA_PASSWORD,
     TOLOKA_USERNAME,
+    UTP_API_KEY,
 )
 from toloka_torznab.tasks import AbstractTask, RenameTorrentsTask
 from toloka_torznab.tasks.consumer import ElectricConsumerTask
@@ -69,6 +71,12 @@ async def main():
 
     api_app.state.engine = engine
     api_app.state.toloka_client = toloka_client
+
+    utp_client: UtpClient | None = None
+    if UTP_API_KEY:
+        utp_client = UtpClient(api_key=UTP_API_KEY)
+        api_app.state.utp_client = utp_client
+        logging.getLogger(__name__).info("UTP client enabled")
 
     tasks: list[AbstractTask] = []
     electric_client: httpx.AsyncClient | None = None
@@ -150,6 +158,8 @@ async def main():
             await electric_client.aclose()
         if qbt_client is not None:
             await qbt_client.close()
+        if utp_client is not None:
+            await utp_client.close()
 
 
 if __name__ == "__main__":

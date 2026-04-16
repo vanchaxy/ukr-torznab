@@ -57,6 +57,8 @@ release = sa.Table(
     sa.Column("ratio", sa.Text, nullable=True),  # AspectRatio.value
     sa.Column("hybrid", sa.Boolean, nullable=True),
     sa.Column("parser_version", sa.Integer, nullable=True),
+    sa.Column("acodec", sa.Text, nullable=True),
+    sa.Column("registered_at", sa.DateTime(timezone=True), nullable=False),
 )
 
 page = sa.Table(
