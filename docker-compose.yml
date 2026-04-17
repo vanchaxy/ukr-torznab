@@ -58,6 +58,19 @@ services:
     volumes:
       - sonarr_data:/config
 
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/Kyiv
+    ports:
+      - "9696:9696"
+    volumes:
+      - prowlarr_data:/config
+
+
 volumes:
   postgres_data:
   sonarr_data:
+  prowlarr_data:

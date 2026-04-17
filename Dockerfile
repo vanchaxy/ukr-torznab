@@ -3,7 +3,7 @@ FROM python:3.13-slim AS builder
 WORKDIR /app
 
 COPY pyproject.toml .
-COPY toloka_torznab/ toloka_torznab/
+COPY ukr_torznab/ ukr_torznab/
 
 RUN pip install --no-cache-dir --prefix=/install .
 
@@ -14,6 +14,6 @@ WORKDIR /app
 
 COPY --from=builder /install /usr/local
 COPY migrations/ migrations/
-COPY toloka_torznab/ toloka_torznab/
+COPY ukr_torznab/ ukr_torznab/
 
-CMD ["python", "-m", "toloka_torznab.main"]
+CMD ["python", "-m", "ukr_torznab.main"]

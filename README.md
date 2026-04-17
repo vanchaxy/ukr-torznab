@@ -169,7 +169,7 @@ Run with SQLite (no Docker required):
 export DATABASE_URL=sqlite+aiosqlite:///toloka.db
 export TOLOKA_USERNAME=your_username
 export TOLOKA_PASSWORD=your_password
-python -m toloka_torznab.main
+python -m ukr_torznab.main
 ```
 
 Lint and type-check:
