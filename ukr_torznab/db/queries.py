@@ -73,11 +73,14 @@ async def upsert_topic(
 
 
 async def get_topic_id_to_download(conn: AsyncConnection):
-    three_hours_ago = datetime.now().astimezone() - timedelta(hours=3)
+    now = datetime.now().astimezone()
+    three_hours_ago = now - timedelta(hours=3)
+    two_days_ago = now - timedelta(days=2)
     query = (
         select(topic.columns.id, topic.columns.download_id)
         .outerjoin(page, topic.columns.id == page.columns.id)
         .where(
+            topic.columns.observed_at > two_days_ago,
             or_(
                 page.columns.id == None,
                 topic.columns.hash_changed_at > page.columns.downloaded_at,
@@ -217,6 +220,7 @@ async def search_releases(
         )
         .join(release, topic.c.id == release.c.id)
         .where(release.c.result == "ok")
+        .where(topic.c.observed_at > datetime.now().astimezone() - timedelta(days=2))
     )
     if q:
         q_lower = q.lower()
