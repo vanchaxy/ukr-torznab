@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "toloka-torznab"
+name = "ukr-torznab"
 dynamic = ["version"]
 requires-python = ">=3.13"
 dependencies = [
@@ -27,6 +27,9 @@ optional-dependencies.dev = [
     "mypy==1.20.0",
     "ruff==0.15.10",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["ukr_torznab"]
 
 [tool.hatch.version]
 path = "ukr_torznab/__init__.py"
