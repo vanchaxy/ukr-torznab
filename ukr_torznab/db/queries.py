@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from ukr_torznab.db.tables import page, release, topic
 from ukr_torznab.db.upsert import upsert
 
-PARSER_VERSION = 3
+PARSER_VERSION = 4
 
 
 def _topic_hash(name, size, download_id, added_on, updated_at) -> str:

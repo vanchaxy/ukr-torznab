@@ -51,7 +51,7 @@ from ukr_torznab.tasks.scraper.parse_topics.season import detect_season
 from ukr_torznab.tasks.scraper.parse_topics.utils import ALLOWED_EXTENSIONS, VIDEO_EXTENSIONS
 
 logger = logging.getLogger(__name__)
-_h2t = html2text.HTML2Text()
+_h2t = html2text.HTML2Text(bodywidth=0)
 
 _AUTHOR_DISALLOWED = re.compile(r"[^a-zа-яёіїєґ0-9_-]+")
 
