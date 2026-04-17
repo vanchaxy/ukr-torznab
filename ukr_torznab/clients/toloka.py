@@ -5,7 +5,6 @@ from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import httpx
-import libtorrent as lt  # type: ignore[import-untyped]
 from httpx_limiter import AsyncRateLimitedTransport, Rate
 from httpx_limiter.aiolimiter import AiolimiterAsyncLimiter
 from lxml import etree
@@ -172,9 +171,7 @@ class TolokaClient:
     async def download_torrent(self, id):
         response = await self._client.get("download.php", params={"id": id})
         response.raise_for_status()
-        try:
-            lt.bdecode(response.content)
-        except Exception:
+        if not response.content.startswith(b"d") or not response.content.endswith(b"e"):
             return None
         return response.content
 
