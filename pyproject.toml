@@ -29,7 +29,7 @@ optional-dependencies.dev = [
 ]
 
 [tool.hatch.version]
-path = "toloka_torznab/__init__.py"
+path = "ukr_torznab/__init__.py"
 
 [tool.ruff]
 line-length = 100

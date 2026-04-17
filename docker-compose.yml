@@ -36,7 +36,7 @@ services:
     working_dir: /app
     command: >
       sh -c "pip install --no-cache-dir -e . &&
-             python -m toloka_torznab.main"
+             python -m ukr_torznab.main"
     env_file:
       - .env
     volumes:
