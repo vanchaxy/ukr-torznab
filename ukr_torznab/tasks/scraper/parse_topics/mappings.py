@@ -42,7 +42,6 @@ QUALITY_BY_VALUE: dict[str, Quality] = {
     "bd-rip": Quality.BLURAY,
     "bdrrip": Quality.BLURAY,
     "bluray": Quality.BLURAY,
-    "hybrid": Quality.BLURAY,
     "bdrip": Quality.BLURAY,
     "hdrip": Quality.BLURAY,
     "brip": Quality.BLURAY,

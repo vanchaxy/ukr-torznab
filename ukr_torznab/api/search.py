@@ -105,7 +105,7 @@ def build_rss(items: list[dict], base_url: str, *, source: str) -> Response:
         etree.SubElement(el, "size").text = str(size)
 
         enc = etree.SubElement(el, "enclosure")
-        enc.set("url", item.get("download_link") or f"{base_url}/download/{item['download_id']}")
+        enc.set("url", item.get("download_link") or f"download/{item['download_id']}")
         enc.set("length", str(size))
         enc.set("type", "application/x-bittorrent")
 
