@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from ukr_torznab.db.tables import page, release, topic
 from ukr_torznab.db.upsert import upsert
 
-PARSER_VERSION = 5
+PARSER_VERSION = 6
 
 
 def _topic_hash(name, size, download_id, added_on, updated_at) -> str:
@@ -258,6 +258,35 @@ async def search_releases(
         )
     query = query.order_by(release.c.registered_at.desc()).offset(offset).limit(limit)
     return [dict(row._mapping) for row in (await conn.execute(query)).fetchall()]
+
+
+async def get_releases_by_infohash(
+    conn: AsyncConnection,
+    infohashes: list[str],
+) -> list[dict]:
+    query = select(
+        release.c.id,
+        release.c.title,
+        release.c.year,
+        release.c.content_type,
+        release.c.season,
+        release.c.season_complete,
+        release.c.file_to_episode,
+        release.c.quality,
+        release.c.resolution,
+        release.c.codec,
+        release.c.audio_types,
+        release.c.audio_sources,
+        release.c.audio_lang,
+        release.c.subtitle_lang,
+        release.c.release_group,
+        release.c.author,
+        release.c.infohash_sha256,
+    ).where(
+        release.c.infohash_sha256.in_(infohashes),
+        release.c.result == "ok",
+    )
+    return [dict(r._mapping) for r in (await conn.execute(query)).fetchall()]
 
 
 async def upsert_release(

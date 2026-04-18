@@ -354,7 +354,7 @@ async def process_single_page(
         resolution=detect_resolution(text, name),
         codec=detect_codec(text, html_lower),
         audio_types=audio_types,
-        audio_sources=detect_audio_sources(html_lower),
+        audio_sources=detect_audio_sources(html_lower, text),
         audio_lang=audio_lang,
         subtitle_lang=sub_lang,
         author=author,

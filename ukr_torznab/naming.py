@@ -146,77 +146,115 @@ _LANG_CODE: dict[Lang, str] = {
 }
 
 _AUDIO_SOURCE_DISPLAY: dict[AudioSource, str] = {
-    AudioSource.INTER: "Inter",
-    AudioSource.K1: "K1",
-    AudioSource.NOVYI_KANAL: "NovyiKanal",
-    AudioSource.PLUS_PLUS: "PlusPlus",
-    AudioSource.TET: "TET",
-    AudioSource.NTN: "NTN",
-    AudioSource.ICTV: "ICTV",
-    AudioSource.TVI: "TVI",
-    AudioSource.UKRAINA: "Ukraina",
-    AudioSource.NLO_TV: "NloTV",
-    AudioSource.STB: "STB",
-    AudioSource.TWO_PLUS_TWO: "2plus2",
-    AudioSource.ONE_PLUS_ONE: "1plus1",
-    AudioSource.PIXEL: "Pixel",
-    AudioSource.PARAMOUNT_COMEDY: "ParamountComedy",
+    AudioSource.AAA_SOUND: "AAASound",
+    AudioSource.ADRIAN_ZP: "AdrianZP",
+    AudioSource.AMANOGAWA: "Amanogawa",
     AudioSource.AMC: "AMC",
-    AudioSource.VOLYA_CINE_PLUS: "VolyaCinePlus",
-    AudioSource.VOLYA_CINE_PLUS_KIDS_HD: "VolyaKidsHD",
-    AudioSource.SUSPILNE_KULTURA: "SuspilneKultura",
-    AudioSource.TVOYE_KINO_RELAX_HD: "TvoyeKino",
-    AudioSource.HUMOR_TB: "HumorTV",
-    AudioSource.UAFLIX: "UAFlix",
-    AudioSource.MEGOGO: "Megogo",
+    AudioSource.AND5: "And5",
+    AudioSource.ANI_UA: "AniUA",
+    AudioSource.ARTHAUS_TRAFFIC: "ArthouseTraffic",
+    AudioSource.ARTYMKO: "ArtymKo",
+    AudioSource.BAIBAKO: "BaibaKo",
+    AudioSource.CINEMAKER: "Cinemaker",
+    AudioSource.CINEMA_SOUND_PRODUCTION: "CinemaSoundProduction",
+    AudioSource.CINETYPE: "CineType",
+    AudioSource.CLAN_KAIZOKU: "Clan Kaizoku",
+    AudioSource.CLOVER_DUB: "CloverDUB",
+    AudioSource.COMEDY_CENTRAL: "СomedyСentral",
+    AudioSource.DIDKO_STUDIO: "DidkoStudio",
+    AudioSource.DIMUA: "DimUA",
+    AudioSource.DNIPROFILM: "DniproFilm",
+    AudioSource.DZUSKI: "Dzuski",
+    AudioSource.ENEYV: "Eneyv",
+    AudioSource.ENTER_FILM: "EnterFilm",
+    AudioSource.ENYKY_BENYKY: "EnikiBeniki",
+    AudioSource.FANVOX_UA: "FanVoxUA",
+    AudioSource.GARNI_LUDY: "HarniLiudy",
+    AudioSource.GLASS_MOON: "GlassMoon",
+    AudioSource.GURTOM_STUDIO: "GurtomStudio",
+    AudioSource.GWEAN_AND_MASLINKA: "GweanMaslinka",
+    AudioSource.HAIDA_MIKE: "HaidaMike",
     AudioSource.HBO_MAX: "HBOMax",
-    AudioSource.APPLE_TV: "AppleTV",
+    AudioSource.HERMAN_LUKYCH: "HermanLukych",
+    AudioSource.HIVENTY: "Hiventy",
+    AudioSource.HUMOR_TB: "HumorTV",
+    AudioSource.ICTV: "ICTV",
+    AudioSource.INARI: "Inari",
+    AudioSource.INDIGO: "Indigo",
+    AudioSource.INTER: "Inter",
+    AudioSource.ITUNES: "iTunes",
+    AudioSource.K1: "K1",
+    AudioSource.KINO: "Kino",
+    AudioSource.KINOTA: "Kinota",
+    AudioSource.KIOTO_ANIME: "KiotoAnime",
+    AudioSource.KIT: "Kit",
+    AudioSource.KOLODIY_TRAYLERIV: "KolodiyTrayleriv",
+    AudioSource.KWA_SOUND_PRODUCTION: "KWASound",
+    AudioSource.KYIVSTAR_TV: "KyivstarTV",
+    AudioSource.LE_DOYEN: "LeDoyen",
+    AudioSource.LINE_IN: "LineIn",
+    AudioSource.LOGOS71: "Logos71",
+    AudioSource.MARIAM_PROJECT: "MariAmProject",
+    AudioSource.MATSURA_UA: "MatsuraUA",
+    AudioSource.MAXWELL_KENNEDY: "MaxwellKennedy",
+    AudioSource.MEGA_TV: "MegaTV",
+    AudioSource.MEGOGO: "Megogo",
+    AudioSource.MELODIC_VOICE_STUDIO: "MelodicVoice",
+    AudioSource.NETFLIX: "Netflix",
+    AudioSource.NE_ZUPYNYAY_PRODUCTION: "DontStopPoduction",
+    AudioSource.NLO_TV: "NloTV",
+    AudioSource.NOVYI_KANAL: "NovyiKanal",
+    AudioSource.NTN: "NTN",
+    AudioSource.OMIKRON: "Omikron",
+    AudioSource.ONE_PLUS_ONE: "1plus1",
     AudioSource.ORIGINAL_BLURAY: "OriginalBluRay",
     AudioSource.ORIGINAL_DVD: "OriginalDVD",
-    AudioSource.V_ODNE_RYLO: "VOdneRylo",
-    AudioSource.HAIDA_MIKE: "GaidaMike",
-    AudioSource.SWEET_SOUND_STUDIO: "SweetSoundStudio",
-    AudioSource.YANIAM: "Yaniam",
-    AudioSource.DNIPROFILM: "DniproFilm",
-    AudioSource.TSIKAVA_IDEYA: "TsikavaIdeya",
-    AudioSource.MATSURA_UA: "MatsuraUA",
+    AudioSource.OZZ_TV: "OzzTV",
+    AudioSource.PARAMOUNT_COMEDY: "ParamountComedy",
+    AudioSource.PERSHYI: "Pershyi",
+    AudioSource.PIE_POST_PRODUCTION: "PiePostProduction",
+    AudioSource.PIXEL: "PixelTV",
+    AudioSource.PLUS_PLUS: "PlusPlus",
     AudioSource.POSTMODERN: "Postmodern",
-    AudioSource.AND5: "And5",
-    AudioSource.LE_DOYEN: "LeDoyen",
-    AudioSource.TAK_TREBA_PRODUCTION: "TakTrebaProduction",
-    AudioSource.KINOTA: "KINOTA",
-    AudioSource.CLOVER_DUB: "CloverDUB",
-    AudioSource.GWEAN_AND_MASLINKA: "GweanMaslinka",
-    AudioSource.OMIKRON: "Omikron",
-    AudioSource.TEREVENI_STUDIO: "TereveniStudio",
-    AudioSource.VOLTS_48: "48Volts",
-    AudioSource.MARIAM_PROJECT: "MariAmProject",
-    AudioSource.NE_ZUPYNYAY_PRODUCTION: "NeZupynyay",
-    AudioSource.TRETYAKOFF: "Tretyakoff",
-    AudioSource.AAA_SOUND: "AAASound",
-    AudioSource.MELODIC_VOICE_STUDIO: "MelodicVoice",
-    AudioSource.DZUSKI: "Dzuski",
+    AudioSource.QTV: "QTV",
     AudioSource.QUAM_PROJECT: "QuamProject",
-    AudioSource.SUB_AUTUMN: "SubAutumn",
-    AudioSource.UFDUB: "UFDUB",
-    AudioSource.STRUGACHKA: "Strugachka",
-    AudioSource.GURTOM_STUDIO: "GurtomStudio",
-    AudioSource.TRY_KRAPKY: "TryKrapky",
-    AudioSource.KOLODIY_TRAYLERIV: "KolodiyTrayleriv",
-    AudioSource.HERMAN_LUKYCH: "HermanLukych",
-    AudioSource.SIMPSONS_UA: "SimpsonsUA",
-    AudioSource.UKRDUB_NET: "UkrDubNet",
-    AudioSource.ARTHAUS_TRAFFIC: "ArthausTraffik",
-    AudioSource.KWA_SOUND_PRODUCTION: "KWASound",
-    AudioSource.AMANOGAWA: "Amanogawa",
-    AudioSource.GLASS_MOON: "GlassMoon",
-    AudioSource.FANVOX_UA: "FanvoxUA",
-    AudioSource.INARI: "Inari",
-    AudioSource.SHIWA: "ShiWa",
-    AudioSource.ENEYV: "Eneyv",
-    AudioSource.LOGOS71: "Logos71",
-    AudioSource.LINE_IN: "LineIn",
+    AudioSource.RAKUTEN: "Rakuten",
     AudioSource.ROBOTA_GOLOSOM: "RobotaGolosom",
+    AudioSource.SATURN_UNION: "SaturnUnion",
+    AudioSource.SHIWA: "Shiwa",
+    AudioSource.SIMPSONS_UA: "SimpsonsUA",
+    AudioSource.SLAVA_RADYK: "SlavaRadyk",
+    AudioSource.STARFALL: "Starfall",
+    AudioSource.STB: "STB",
+    AudioSource.STRUGACHKA: "Strugachka",
+    AudioSource.STUDIO_15K3: "15K3",
+    AudioSource.SUB_AUTUMN: "SubAutumn",
+    AudioSource.SUNNYSIDERS: "Іunnysiders",
+    AudioSource.SUSPILNE_KULTURA: "SuspilneKultura",
+    AudioSource.SWEET_SOUND_STUDIO: "SweetSoundStudio",
+    AudioSource.TAK_TREBA_PRODUCTION: "TakTrebaProduction",
+    AudioSource.TEREVENI_STUDIO: "TereveniStudio",
+    AudioSource.TET: "TET",
+    AudioSource.TRETYAKOFF: "Tretyakoff",
+    AudioSource.TRY_KRAPKY: "TryKrapky",
+    AudioSource.TSIKAVA_IDEYA: "TsikavaIdeya",
+    AudioSource.TV5: "TV5",
+    AudioSource.TVI: "TVI",
+    AudioSource.TVIY_PRODUCTION: "ЕviyProduction",
+    AudioSource.TVOYE_KINO_RELAX_HD: "TvoyeKino",
+    AudioSource.TWO_PLUS_TWO: "2plus2",
+    AudioSource.UAFLIX: "UAFlix",
+    AudioSource.UATEAM: "UATeam",
+    AudioSource.UAVOICE: "UAVoice",
+    AudioSource.UFDUB: "UFDUB",
+    AudioSource.UKRAINA: "Ukraina",
+    AudioSource.UKRDUB_NET: "UkrDubNet",
+    AudioSource.VHS_RECORD: "VHSRECORD",
+    AudioSource.VOLTS_48: "48Volts",
+    AudioSource.VOLYA_CINE_PLUS: "VolyaCinePlus",
+    AudioSource.VOLYA_CINE_PLUS_KIDS_HD: "VolyaKidsHD",
+    AudioSource.V_ODNE_RYLO: "VOdneRylo",
+    AudioSource.YANIAM: "Yaniam",
 }
 
 # Reverse lookup dicts keyed by the .value / .name strings stored in the DB
@@ -241,7 +279,6 @@ def codec_tag(codec: str | None) -> str:
 
 
 def audio_tag(audio_types_json: str | None) -> str:
-    """DUB+MVO or ORIGINAL etc. from JSON list of AudioType values."""
     if not audio_types_json:
         return ""
     tags = [
@@ -253,7 +290,6 @@ def audio_tag(audio_types_json: str | None) -> str:
 
 
 def locale_tag(audio_lang_json: str | None) -> str:
-    """Audio languages as full words: Ukrainian.English etc."""
     if not audio_lang_json:
         return ""
     names = [
@@ -265,12 +301,6 @@ def locale_tag(audio_lang_json: str | None) -> str:
 
 
 def subtitle_tag(subtitle_lang_json: str | None) -> str:
-    """Subtitle languages as subCODE tokens: subUKR.subENG etc.
-
-    The "sub" prefix fuses with the 3-letter code into a single word,
-    so Sonarr's \\b-anchored regex cannot match the code standalone
-    and won't mis-detect subtitles as audio languages.
-    """
     if not subtitle_lang_json:
         return ""
     tags = [
@@ -282,7 +312,6 @@ def subtitle_tag(subtitle_lang_json: str | None) -> str:
 
 
 def audio_source_tag(audio_sources_json: str | None) -> str:
-    """Studio/channel names: Postmodern+STB etc. from JSON list of AudioSource.name values."""
     if not audio_sources_json:
         return ""
     tags = [
@@ -294,7 +323,6 @@ def audio_source_tag(audio_sources_json: str | None) -> str:
 
 
 def _group_tag(row: dict) -> str:
-    """release_group with author as fallback, sanitized."""
     g = row.get("release_group") or row.get("author")
     return _sanitize(str(g)) if g else ""
 
@@ -305,10 +333,6 @@ def _build_parts(
     season: int | None = None,
     episode: int | None = None,
 ) -> list[str]:
-    """Ordered name components without group suffix or ID.
-
-    Format: Title Year [S##E##] Source Resolution VCodec AudioType AudioLang [subLang] [Studio]
-    """
     parts: list[str] = []
 
     if row.get("title"):
@@ -370,11 +394,6 @@ def _build_parts(
 
 
 def release_name(row: dict) -> str:
-    """Full tracker-style release name for Torznab RSS <title>.
-
-    Includes S##E## for single episodes, S## for season packs.
-    Ends with -Group suffix if release_group or author is set.
-    """
     season = row.get("season")
     last_ep = row.get("last_episode")
     season_complete = row.get("season_complete")
@@ -386,46 +405,18 @@ def release_name(row: dict) -> str:
     return f"{base}-{group}" if group else base
 
 
-def movie_folder(row: dict) -> str:
-    """Full tracker-style folder name, identical base to movie_filename.
-
-    e.g. 'Inception 2010 BluRay 1080p x264 DUB Ukrainian Sub.Ukrainian Postmodern-author-ID12345'
-    """
-    parts = _build_parts(row)
+def tv_folder(row: dict, *, seasons: list[int] | None = None) -> str:
+    season = None
+    if seasons and len(seasons) == 1:
+        season = seasons[0]
+    parts = _build_parts(row, season=season)
     base = " ".join(parts)
     group = _group_tag(row)
-    release_id = row.get("id")
-
-    suffix = f"-{group}" if group else ""
-    id_tag = f"-ID{release_id}" if release_id is not None else ""
-    return f"{base}{suffix}{id_tag}"
-
-
-def tv_folder(row: dict, *, seasons: set[int] | None = None) -> str:
-    """Single-season: 'Title (Year) S01-ID12345'. Multi-season: 'Title (Year)-ID12345'."""
-    title = _sanitize(row.get("title") or "Unknown")
-    year_val = row.get("year")
-    year = f" ({year_val})" if year_val else ""
-    season = row.get("season")
-    single = season is not None and (seasons is None or len(seasons) == 1)
-    season_suffix = f" S{season:02d}" if single else ""
-    release_id = row.get("id")
-    id_tag = f"-ID{release_id}" if release_id is not None else ""
-    return f"{title}{year}{season_suffix}{id_tag}"
-
-
-def movie_filename(row: Any, ext: str) -> str:
-    """Full movie filename. Base identical to movie_folder."""
-    return f"{movie_folder(row)}{ext}"
+    return f"{base}-{group}" if group else base
 
 
 def episode_filename(row: Any, season: int, episode: int, ext: str) -> str:
-    """Episode filename. No ID — ends with -Group if present.
-
-    e.g. 'Game of Thrones 2011 S01E05 WEBRip 1080p x265 MVO Ukrainian subUKR STB-author.mkv'
-    """
     parts = _build_parts(row, season=season, episode=episode)
     base = " ".join(parts)
     group = _group_tag(row)
-    suffix = f"-{group}" if group else ""
-    return f"{base}{suffix}{ext}"
+    return f"{base}-{group}{ext}" if group else base

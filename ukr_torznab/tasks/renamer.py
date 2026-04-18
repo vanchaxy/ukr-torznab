@@ -3,19 +3,21 @@ import hashlib
 import json
 import logging
 import os
+import re
 from pathlib import PurePosixPath
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ukr_torznab.clients.qbittorrent import QBittorrentClient
-from ukr_torznab.db.tables import release
-from ukr_torznab.naming import episode_filename, movie_filename, movie_folder, tv_folder
+from ukr_torznab.clients.utp import UtpClient, extract_episode_numbers
+from ukr_torznab.db.queries import get_releases_by_infohash
+from ukr_torznab.naming import episode_filename, release_name, tv_folder
 from ukr_torznab.tasks.base import AbstractTask
+from ukr_torznab.tasks.scraper.parse_topics.utils import VIDEO_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
-_VIDEO_EXTS = {".mkv", ".mp4", ".avi", ".ts", ".m2ts", ".mov"}
+_UTP_COMMENT_RE = re.compile(r"https://utp\.to/torrents/(\d+)")
 
 
 def _sha256_of_sha1(sha1_hex: str) -> str:
@@ -23,133 +25,221 @@ def _sha256_of_sha1(sha1_hex: str) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _build_file_to_episode(row: dict, torrent_files: list[dict]) -> dict[str, list[int]] | None:
+    video_files = [
+        f
+        for f in torrent_files
+        if os.path.splitext(f.get("name", ""))[1].lower() in VIDEO_EXTENSIONS
+    ]
+    if not video_files:
+        return None
+    paths = [f["name"] for f in video_files]
+    ep_map = extract_episode_numbers(paths)
+    if ep_map is None:
+        return None
+    season = row.get("season") or 1
+    return {filename.lower(): [season, ep] for filename, ep in ep_map.items()}
+
+
 class RenameTorrentsTask(AbstractTask):
-    def __init__(self, *, engine: AsyncEngine, qbt_client: QBittorrentClient) -> None:
+    def __init__(
+        self,
+        *,
+        engine: AsyncEngine,
+        qbt_client: QBittorrentClient,
+        utp_client: UtpClient | None = None,
+    ) -> None:
         self.engine = engine
         self.qbt_client = qbt_client
+        self.utp_client = utp_client
 
     async def run_once(self) -> None:
-        paused = await self.qbt_client.get_paused_torrents()
-        if not paused:
-            await asyncio.sleep(60)
-            return
+        stopped = await self.qbt_client.get_stopped_torrents(categories=["movies", "tv"])
+        for _ in range(60):
+            if not self.running:
+                return
+            await asyncio.sleep(1)
 
-        sha256_to_qbt: dict[str, str] = {}
-        for t in paused:
-            qbt_hash = t.get("hash", "")
-            if qbt_hash:
-                sha256_to_qbt[_sha256_of_sha1(qbt_hash)] = qbt_hash
+        utp_torrents: list[tuple[str, str]] = []  # (qbt_hash, utp_id)
+        toloka_hashes: list[str] = []
 
-        if not sha256_to_qbt:
-            await asyncio.sleep(60)
-            return
+        for torrent in stopped:
+            qbt_hash = torrent["hash"]
+            comment = torrent.get("comment") or ""
+            utp_id = _UTP_COMMENT_RE.search(comment)
+            if utp_id:
+                utp_torrents.append((qbt_hash, utp_id.group(1)))
+            elif "toloka" in comment:
+                toloka_hashes.append(qbt_hash)
 
-        async with self.engine.connect() as conn:
-            rows = [
-                dict(r._mapping)
-                for r in (
-                    await conn.execute(
-                        select(
-                            release.c.id,
-                            release.c.title,
-                            release.c.year,
-                            release.c.content_type,
-                            release.c.season,
-                            release.c.season_complete,
-                            release.c.file_to_episode,
-                            release.c.quality,
-                            release.c.resolution,
-                            release.c.codec,
-                            release.c.audio_types,
-                            release.c.audio_sources,
-                            release.c.audio_lang,
-                            release.c.subtitle_lang,
-                            release.c.release_group,
-                            release.c.author,
-                            release.c.infohash_sha256,
-                        ).where(
-                            release.c.infohash_sha256.in_(list(sha256_to_qbt.keys())),
-                            release.c.result == "ok",
-                        ),
-                    )
-                ).fetchall()
-            ]
-
-        for row in rows:
-            qbt_hash = sha256_to_qbt.get(row["infohash_sha256"])
-            if not qbt_hash:
+        for qbt_hash, utp_id in utp_torrents:
+            if self.utp_client is None:
+                logger.warning("UTP torrent id=%s skipped: no UTP client configured", utp_id)
                 continue
             try:
-                await self._rename_and_resume(row, qbt_hash)
+                row = await self.utp_client.get_by_id(utp_id)
+                if row is None:
+                    logger.warning("UTP torrent id=%s not found via API, skipping", utp_id)
+                    continue
+                await self._rename_and_start(row, qbt_hash)
             except Exception:
-                logger.exception("Failed to rename torrent %s (hash=%s)", row["id"], qbt_hash)
+                logger.exception("Failed to rename UTP torrent id=%s hash=%s", utp_id, qbt_hash)
+
+        if toloka_hashes:
+            sha256_to_qbt = {_sha256_of_sha1(h): h for h in toloka_hashes}
+            async with self.engine.connect() as conn:
+                rows = await get_releases_by_infohash(conn, list(sha256_to_qbt.keys()))
+            for row in rows:
+                qbt_hash = sha256_to_qbt.get(row["infohash_sha256"])
+                if not qbt_hash:
+                    continue
+                try:
+                    await self._rename_and_start(row, qbt_hash)
+                except Exception:
+                    logger.exception("Failed to rename torrent %s hash=%s", row["id"], qbt_hash)
 
         await asyncio.sleep(60)
 
-    async def _rename_and_resume(self, row: dict, qbt_hash: str) -> None:
-        is_tv = row["content_type"] == "tv"
+    async def _rename_and_start(self, row: dict, qbt_hash: str) -> None:
+        is_tv = row.get("content_type") == "tv"
+        torrent_files = await self.qbt_client.get_torrent_files(qbt_hash)
 
         file_to_episode: dict[str, list[int]] | None = None
-        if row["file_to_episode"]:
-            file_to_episode = {k: v for k, v in json.loads(row["file_to_episode"]).items()}
+        if is_tv:
+            if "file_to_episode" in row:
+                raw_fte = row["file_to_episode"]
+                if raw_fte:
+                    file_to_episode = {k.lower(): v for k, v in json.loads(raw_fte).items()}
+            else:
+                file_to_episode = _build_file_to_episode(row, torrent_files)
 
-        if is_tv and file_to_episode and not row["season_complete"]:
-            await self._rename_tv_episodes(row, qbt_hash, file_to_episode)
-        elif is_tv and row["season_complete"]:
-            seasons_in_row = {row["season"]} if row["season"] is not None else None
-            folder = tv_folder(row, seasons=seasons_in_row)
-            await self.qbt_client.rename_torrent(qbt_hash, folder)
-            await self.qbt_client.resume(qbt_hash)
-            logger.info("Renamed & resumed season pack %s → %r", row["id"], folder)
+        await self.qbt_client.rename_torrent(qbt_hash, release_name(row))
+        await self._apply_renames(row, qbt_hash, torrent_files, is_tv, file_to_episode)
+        await self.qbt_client.add_tags(qbt_hash, ["renamed"])
+        await self.qbt_client.start(qbt_hash)
+        logger.info("Renamed & resumed torrent %s (hash=%s)", row.get("id"), qbt_hash)
+
+    async def _apply_renames(
+        self,
+        row: dict,
+        qbt_hash: str,
+        all_files: list[dict],
+        is_tv: bool,
+        file_to_episode: dict[str, list[int]] | None,
+    ) -> None:
+        has_folder = any("/" in f.get("name", "") for f in all_files)
+        old_folder = all_files[0]["name"].split("/")[0] if has_folder else None
+        video_files = [
+            f
+            for f in all_files
+            if os.path.splitext(f.get("name", ""))[1].lower() in VIDEO_EXTENSIONS
+        ]
+
+        if not has_folder and len(all_files) == 1:
+            await self._rename_single_file(row, qbt_hash, all_files[0], is_tv, file_to_episode)
+        elif len(video_files) == 1:
+            await self._rename_single_video(
+                row,
+                qbt_hash,
+                video_files[0],
+                is_tv,
+                file_to_episode,
+                old_folder,
+            )
+        elif not is_tv:
+            if old_folder:
+                await self.qbt_client.rename_folder(qbt_hash, old_folder, release_name(row))
+        elif file_to_episode:
+            await self._rename_tv_episodes(row, qbt_hash, video_files, file_to_episode, old_folder)
+        elif old_folder:
+            season = row.get("season")
+            await self.qbt_client.rename_folder(
+                qbt_hash,
+                old_folder,
+                tv_folder(row, seasons=[season] if season else None),
+            )
+
+    async def _rename_single_file(
+        self,
+        row: dict,
+        qbt_hash: str,
+        file_entry: dict,
+        is_tv: bool,
+        file_to_episode: dict[str, list[int]] | None,
+    ) -> None:
+        old = file_entry.get("name", "")
+        ext = os.path.splitext(old)[1]
+        if is_tv and file_to_episode and old.lower() in file_to_episode:
+            s, e = file_to_episode[old.lower()]
+            new_name = episode_filename(row, s, e, ext)
         else:
-            await self._rename_movie(row, qbt_hash)
+            new_name = release_name(row) + ext
+        if old != new_name:
+            await self.qbt_client.rename_file(qbt_hash, old, new_name)
+
+    async def _rename_single_video(
+        self,
+        row: dict,
+        qbt_hash: str,
+        video_entry: dict,
+        is_tv: bool,
+        file_to_episode: dict[str, list[int]] | None,
+        old_folder: str | None,
+    ) -> None:
+        old_path = video_entry.get("name", "")
+        old_basename = PurePosixPath(old_path).name
+        ext = os.path.splitext(old_basename)[1]
+
+        if is_tv and file_to_episode and old_path.lower() in file_to_episode:
+            s, e = file_to_episode[old_path.lower()]
+            new_folder = tv_folder(row, seasons=[s])
+            new_basename = episode_filename(row, s, e, ext)
+        else:
+            new_folder = release_name(row)
+            new_basename = release_name(row) + ext
+
+        if old_folder:
+            await self.qbt_client.rename_folder(qbt_hash, old_folder, new_folder)
+            await self.qbt_client.rename_file(
+                qbt_hash,
+                f"{new_folder}/{old_basename}",
+                f"{new_folder}/{new_basename}",
+            )
+        else:
+            await self.qbt_client.rename_file(qbt_hash, old_path, new_basename)
 
     async def _rename_tv_episodes(
         self,
         row: dict,
         qbt_hash: str,
+        video_files: list[dict],
         file_to_episode: dict[str, list[int]],
+        old_folder: str | None,
     ) -> None:
-        seasons: set[int] = {se for se, _ep in file_to_episode.values()}
-        folder = tv_folder(row, seasons=seasons)
+        seasons = list({v[0] for v in file_to_episode.values()})
+        new_folder = tv_folder(row, seasons=seasons or None)
 
-        torrent_files = await self.qbt_client.get_torrent_files(qbt_hash)
-        for f in torrent_files:
-            old_path: str = f.get("name", "")
-            filename = PurePosixPath(old_path).name
-            if filename not in file_to_episode:
+        if old_folder:
+            await self.qbt_client.rename_folder(qbt_hash, old_folder, new_folder)
+            folder_prefix = new_folder
+        else:
+            folder_prefix = None
+
+        for f in video_files:
+            old_path = f.get("name", "")
+            old_basename = PurePosixPath(old_path).name
+            if old_path.lower() not in file_to_episode:
                 continue
-            s, e = file_to_episode[filename][0], file_to_episode[filename][1]
-            ext = os.path.splitext(filename)[1]
-            new_path = episode_filename(row, s, e, ext)
-            if old_path != new_path:
-                await self.qbt_client.rename_file(qbt_hash, old_path, new_path)
-                logger.debug("  file: %r → %r", old_path, new_path)
-
-        await self.qbt_client.rename_torrent(qbt_hash, folder)
-        await self.qbt_client.resume(qbt_hash)
-        logger.info("Renamed & resumed TV torrent %s → %r", row["id"], folder)
-
-    async def _rename_movie(self, row: dict, qbt_hash: str) -> None:
-        torrent_files = await self.qbt_client.get_torrent_files(qbt_hash)
-        video_files = [
-            f
-            for f in torrent_files
-            if os.path.splitext(f.get("name", ""))[1].lower() in _VIDEO_EXTS
-        ]
-        if not video_files:
-            logger.warning("No video file found for movie torrent %s, skipping", row["id"])
-            return
-
-        old_path: str = video_files[0]["name"]
-        ext = os.path.splitext(PurePosixPath(old_path).name)[1]
-        new_name = movie_filename(row, ext)
-
-        if old_path != new_name:
-            await self.qbt_client.rename_file(qbt_hash, old_path, new_name)
-
-        if "/" in old_path:
-            await self.qbt_client.rename_torrent(qbt_hash, movie_folder(row))
-
-        await self.qbt_client.resume(qbt_hash)
-        logger.info("Renamed & resumed movie %s: %r → %r", row["id"], old_path, new_name)
+            s, e = file_to_episode[old_path.lower()]
+            new_basename = episode_filename(row, s, e, os.path.splitext(old_basename)[1])
+            if old_basename == new_basename:
+                continue
+            if folder_prefix:
+                await self.qbt_client.rename_file(
+                    qbt_hash,
+                    f"{folder_prefix}/{old_basename}",
+                    f"{folder_prefix}/{new_basename}",
+                )
+            else:
+                await self.qbt_client.rename_file(qbt_hash, old_path, new_basename)
+            logger.debug("  file: %r → %r", old_basename, new_basename)

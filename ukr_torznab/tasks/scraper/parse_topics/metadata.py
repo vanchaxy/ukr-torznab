@@ -7,6 +7,7 @@ from decancer_py import parse as decancer_parse
 from ukr_torznab.enums import AudioSource, AudioType, CodecFamily, Lang, Quality, Resolution
 from ukr_torznab.tasks.scraper.parse_topics.mappings import (
     AUDIO_SOURCE_MAP,
+    AUDIO_SOURCE_TITLES_MAP,
     AUDIO_TYPE_MAP,
     CODEC_MAP,
     LANG_MAP,
@@ -115,12 +116,24 @@ def detect_audio_types(text: str) -> set[AudioType]:
     return tracks or {AudioType.UNKNOWN}
 
 
-def detect_audio_sources(html_lower: str) -> set[AudioSource]:
+def detect_audio_sources(html_lower: str, text: str) -> set[AudioSource]:
     """Detect dubbing studios / TV channels mentioned in the page HTML."""
     found: set[AudioSource] = set()
-    for tag, source in AUDIO_SOURCE_MAP.items():
+    for tag, source in AUDIO_SOURCE_MAP:
         if tag in html_lower:
             found.add(source)
+    title_rows = (
+        re.findall(
+            r"(?i)(?:Audio|Аудіо)(?:\s+#\d+)?(?:(?!(?:Text|Текст)(?:\s+#\d+)?)[\s\S])*?(?<!Комерційна.)(?:Title|Назва)\s*:\s*([^\r\n]+)",
+            text,
+        )
+        + re.findall(r".*переклад:(.+)", text)
+        + re.findall(r".*озвучення:(.+)", text)
+    )
+    for tag, source in AUDIO_SOURCE_TITLES_MAP:
+        for row in title_rows:
+            if re.findall(tag, row):
+                found.add(source)
     return found
 
 

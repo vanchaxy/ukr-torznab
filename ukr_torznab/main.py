@@ -131,7 +131,9 @@ async def main():
 
         qbt_client = QBittorrentClient(QBITTORRENT_URL, QBITTORRENT_USERNAME, QBITTORRENT_PASSWORD)
         await qbt_client.login()
-        tasks.append(RenameTorrentsTask(engine=engine, qbt_client=qbt_client))
+        tasks.append(
+            RenameTorrentsTask(engine=engine, qbt_client=qbt_client, utp_client=utp_client),
+        )
 
     for task in tasks:
         task.start()

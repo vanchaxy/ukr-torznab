@@ -22,11 +22,8 @@ from ukr_torznab.enums import (
 
 log = logging.getLogger(__name__)
 
-_BASE_URL = "https://utp.to/api/torrents/filter"
+_BASE_URL = "https://utp.to/api/torrents"
 
-# ---------------------------------------------------------------------------
-# unit3D "type" → Quality enum
-# ---------------------------------------------------------------------------
 _TYPE_TO_QUALITY: dict[str, Quality] = {
     "Encode": Quality.BLURAY,
     "Remux": Quality.REMUX,
@@ -43,9 +40,6 @@ _RESOLUTION_MAP: dict[str, Resolution] = {
     "1080i": Resolution.FHD_1080P,
 }
 
-# ---------------------------------------------------------------------------
-# Release-name parsing (ported from utp.ipynb)
-# ---------------------------------------------------------------------------
 QUALITY_RE = re.compile(
     r"(?i)\b(?:1080[pi]|2160p|"
     r"web-?dl|web-?rip|bd-?remux|bd-?rip|hd-?tv-?rip|hdtv|"
@@ -204,9 +198,6 @@ def parse_release(name: str, is_tv: bool) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# MediaInfo parsing (ported from utp.ipynb)
-# ---------------------------------------------------------------------------
 def parse_mediainfo(text: str) -> dict[str, list[dict[str, str]]]:
     """Parse mediainfo text into sections with key-value dicts."""
     sections: dict[str, list[dict[str, str]]] = defaultdict(list)
@@ -234,9 +225,6 @@ def parse_mediainfo(text: str) -> dict[str, list[dict[str, str]]]:
     return dict(sections)
 
 
-# ---------------------------------------------------------------------------
-# Audio track analysis (ported from utp.ipynb)
-# ---------------------------------------------------------------------------
 _LANG_MAP: list[tuple[str, Lang]] = [
     ("ukrainian", Lang.UKRAINIAN),
     ("english", Lang.ENGLISH),
@@ -296,114 +284,161 @@ def _parse_lang(raw: str) -> Lang:
     return Lang.UNKNOWN
 
 
-# Studio detection from audio track titles (ported from utp.ipynb)
-_STUDIO_MAP: list[tuple[str, AudioSource]] = [
-    ("dniprofilm", AudioSource.DNIPROFILM),
-    ("amc", AudioSource.AMC),
-    ("le doyen", AudioSource.LE_DOYEN),
-    ("ledoyen", AudioSource.LE_DOYEN),
-    ("ictv", AudioSource.ICTV),
-    ("1+1", AudioSource.ONE_PLUS_ONE),
-    ("cine+", AudioSource.VOLYA_CINE_PLUS),
-    ("\u0456\u043d\u0442\u0435\u0440", AudioSource.INTER),  # інтер
-    ("inter", AudioSource.INTER),
-    ("\u043d\u043e\u0432\u0438\u0439", AudioSource.NOVYI_KANAL),  # новий
-    ("2+2", AudioSource.TWO_PLUS_TWO),
-    ("\u043a1", AudioSource.K1),  # к1
-    ("k1", AudioSource.K1),
-    ("\u043d\u0442\u043d", AudioSource.NTN),  # нтн
-    ("uaflix", AudioSource.UAFLIX),
-    ("postmodern", AudioSource.POSTMODERN),
-    (
-        "\u043f\u043e\u0441\u0442\u043c\u043e\u0434\u0435\u0440\u043d",
-        AudioSource.POSTMODERN,
-    ),  # постмодерн
-    ("\u0442\u0435\u0442", AudioSource.TET),  # тет
-    ("tet", AudioSource.TET),
-    ("\u043d\u043b\u043e", AudioSource.NLO_TV),  # нло
-    ("nlo", AudioSource.NLO_TV),
-    ("megogo", AudioSource.MEGOGO),
-    ("\u0443\u043a\u0440\u0430\u0457\u043d\u0430", AudioSource.UKRAINA),  # україна
-    ("\u0434\u0456\u043c", AudioSource.PIXEL),  # дім (Pixel/Dom channel)
-    ("cloverdub", AudioSource.CLOVER_DUB),
-    ("\u0430\u0430\u0430-sound", AudioSource.AAA_SOUND),  # ааа-sound
-    ("aaa-sound", AudioSource.AAA_SOUND),
-    (
-        "\u0442\u0432\u043e\u0454 \u043a\u0456\u043d\u043e",
-        AudioSource.TVOYE_KINO_RELAX_HD,
-    ),  # твоє кіно
-    ("blu-ray", AudioSource.ORIGINAL_BLURAY),
-    ("vhs record", AudioSource.SWEET_SOUND_STUDIO),
-    (
-        "\u0442\u0430\u043a\u0442\u0440\u0435\u0431\u0430\u043f\u0440\u043e\u0434\u0430\u043a\u0448\u043d",
-        AudioSource.TAK_TREBA_PRODUCTION,
-    ),  # тактребапродакшн
-    (
-        "\u0442\u0430\u043a \u0442\u0440\u0435\u0431\u0430 \u043f\u0440\u043e\u0434\u0430\u043a\u0448\u043d",
-        AudioSource.TAK_TREBA_PRODUCTION,
-    ),  # так треба продакшн
-    ("paramount comedy", AudioSource.PARAMOUNT_COMEDY),
-    (
-        "\u0446\u0456\u043a\u0430\u0432\u0430 \u0456\u0434\u0435\u044f",
-        AudioSource.TSIKAVA_IDEYA,
-    ),  # цікава ідея
-    ("fanvoxua", AudioSource.FANVOX_UA),
-    (
-        "\u0432 \u043e\u0434\u043d\u0435 \u0440\u0438\u043b\u043e",
-        AudioSource.V_ODNE_RYLO,
-    ),  # в одне рило
-    ("dvd", AudioSource.ORIGINAL_DVD),
-    ("gwean & maslinka", AudioSource.GWEAN_AND_MASLINKA),
-    ("amanogawa", AudioSource.AMANOGAWA),
-    (
-        "\u043a\u043e\u043b\u043e\u0434\u0456\u0439 \u0442\u0440\u0435\u0439\u043b\u0435\u0440\u0456\u0432",
-        AudioSource.KOLODIY_TRAYLERIV,
-    ),  # колодій трейлерів
-    ("\u043e\u043c\u0456\u043a\u0440\u043e\u043d", AudioSource.OMIKRON),  # омікрон
-    ("tretyakoff", AudioSource.TRETYAKOFF),
-    ("\u0441\u0442\u0431", AudioSource.STB),  # стб
-    (
-        "\u0441\u0443\u0441\u043f\u0456\u043b\u044c\u043d\u0435 \u043a\u0443\u043b\u044c\u0442\u0443\u0440\u0430",
-        AudioSource.SUSPILNE_KULTURA,
-    ),  # суспільне культура
-    (
-        "\u043d\u0435\u0437\u0443\u043f\u0438\u043d\u044f\u0439\u043f\u0440\u043e\u0434\u0430\u043a\u0448\u043d",
-        AudioSource.NE_ZUPYNYAY_PRODUCTION,
-    ),  # незупиняйпродакшн
-    ("dzuski", AudioSource.DZUSKI),
-    ("inaridub", AudioSource.INARI),
-    (
-        "\u0440\u043e\u0431\u043e\u0442\u0430 \u0433\u043e\u043b\u043e\u0441\u043e\u043c",
-        AudioSource.ROBOTA_GOLOSOM,
-    ),
-    # робота голосом
-    ("\u043f\u043b\u044e\u0441\u043f\u043b\u044e\u0441", AudioSource.PLUS_PLUS),  # плюсплюс
-    ("simpsonsua", AudioSource.SIMPSONS_UA),
-    ("sweet", AudioSource.SWEET_SOUND_STUDIO),
-    ("hth", AudioSource.HUMOR_TB),
-]
+_STUDIO_MAP: list[tuple[str, AudioSource]] = sorted(
+    [
+        ("ааа-sound", AudioSource.AAA_SOUND),
+        ("aaa-sound", AudioSource.AAA_SOUND),
+        ("aaa sound", AudioSource.AAA_SOUND),
+        ("aaasound", AudioSource.AAA_SOUND),
+        ("ааа sound", AudioSource.AAA_SOUND),
+        ("amanogawa", AudioSource.AMANOGAWA),
+        ("amc", AudioSource.AMC),
+        ("амс", AudioSource.AMC),
+        ("aniua", AudioSource.ANI_UA),
+        ("артхаус трафік", AudioSource.ARTHAUS_TRAFFIC),
+        ("artymko", AudioSource.ARTYMKO),
+        ("baibako.tv", AudioSource.BAIBAKO),
+        ("baibako", AudioSource.BAIBAKO),
+        ("cinemaker", AudioSource.CINEMAKER),
+        ("cinema sound production", AudioSource.CINEMA_SOUND_PRODUCTION),
+        ("cinemasoundproduction", AudioSource.CINEMA_SOUND_PRODUCTION),
+        ("cinema sound ua", AudioSource.CINEMA_SOUND_PRODUCTION),
+        ("cinetype", AudioSource.CINETYPE),
+        ("clankaizoku", AudioSource.CLAN_KAIZOKU),
+        ("kaizoku", AudioSource.CLAN_KAIZOKU),
+        ("cloverdub", AudioSource.CLOVER_DUB),
+        ("comedy central", AudioSource.COMEDY_CENTRAL),
+        ("comedycentral", AudioSource.COMEDY_CENTRAL),
+        ("didko studio", AudioSource.DIDKO_STUDIO),
+        ("didkostudio", AudioSource.DIDKO_STUDIO),
+        ("dniprofilm", AudioSource.DNIPROFILM),
+        ("rezka", AudioSource.DNIPROFILM),
+        ("dzuski", AudioSource.DZUSKI),
+        ("enter-фільм", AudioSource.ENTER_FILM),
+        ("enterfilm", AudioSource.ENTER_FILM),
+        ("ентер", AudioSource.ENTER_FILM),
+        ("enter", AudioSource.ENTER_FILM),
+        ("еники-беники", AudioSource.ENYKY_BENYKY),
+        ("fanvoxua", AudioSource.FANVOX_UA),
+        ("гарні люди", AudioSource.GARNI_LUDY),
+        ("гарнілюди", AudioSource.GARNI_LUDY),
+        ("glassmoon", AudioSource.GLASS_MOON),
+        ("glass moon", AudioSource.GLASS_MOON),
+        ("gwean & maslinka", AudioSource.GWEAN_AND_MASLINKA),
+        ("gwean&maslinka", AudioSource.GWEAN_AND_MASLINKA),
+        ("гайдамайк", AudioSource.HAIDA_MIKE),
+        ("hiventy", AudioSource.HIVENTY),
+        ("hth", AudioSource.HUMOR_TB),
+        ("ictv", AudioSource.ICTV),
+        ("inaridub", AudioSource.INARI),
+        ("inariokami", AudioSource.INARI),
+        ("індиго", AudioSource.INDIGO),
+        ("інтер", AudioSource.INTER),
+        ("inter", AudioSource.INTER),
+        ("itunes", AudioSource.ITUNES),
+        ("к1", AudioSource.K1),
+        ("k1", AudioSource.K1),
+        ("kiho", AudioSource.KINO),
+        ("кіно", AudioSource.KINO),
+        ("kioto anime", AudioSource.KIOTO_ANIME),
+        ("кіт", AudioSource.KIT),
+        ("kit", AudioSource.KIT),
+        ("колодій трейлерів", AudioSource.KOLODIY_TRAYLERIV),
+        ("колодійтрейлерів", AudioSource.KOLODIY_TRAYLERIV),
+        ("київстар тб", AudioSource.KYIVSTAR_TV),
+        ("le doyen", AudioSource.LE_DOYEN),
+        ("ledoyen", AudioSource.LE_DOYEN),
+        ("matsura", AudioSource.MATSURA_UA),
+        ("maxwell kennedy", AudioSource.MAXWELL_KENNEDY),
+        ('тк "мега"', AudioSource.MEGA_TV),
+        ("megogo", AudioSource.MEGOGO),
+        ("mgg", AudioSource.MEGOGO),
+        ("netflix", AudioSource.NETFLIX),
+        ("незупиняйпродакшн", AudioSource.NE_ZUPYNYAY_PRODUCTION),
+        ("нло", AudioSource.NLO_TV),
+        ("nlo", AudioSource.NLO_TV),
+        ("новий", AudioSource.NOVYI_KANAL),
+        ("novy", AudioSource.NOVYI_KANAL),
+        ("нтн", AudioSource.NTN),
+        ("омікрон", AudioSource.OMIKRON),
+        ("omikron", AudioSource.OMIKRON),
+        ("1+1", AudioSource.ONE_PLUS_ONE),
+        ("blu-ray", AudioSource.ORIGINAL_BLURAY),
+        ("dvd", AudioSource.ORIGINAL_DVD),
+        ("ozz tv", AudioSource.OZZ_TV),
+        ("paramount comedy", AudioSource.PARAMOUNT_COMEDY),
+        ("paramountcomedy", AudioSource.PARAMOUNT_COMEDY),
+        ("перший", AudioSource.PERSHYI),
+        ("piepostproduction", AudioSource.PIE_POST_PRODUCTION),
+        ("дім", AudioSource.PIXEL),
+        ("плюсплюс", AudioSource.PLUS_PLUS),
+        ("postmodern", AudioSource.POSTMODERN),
+        ("постмодерн", AudioSource.POSTMODERN),
+        ("qtv", AudioSource.QTV),
+        ("rakuten", AudioSource.RAKUTEN),
+        ("робота голосом", AudioSource.ROBOTA_GOLOSOM),
+        ("роботаголосом", AudioSource.ROBOTA_GOLOSOM),
+        ("saturn union", AudioSource.SATURN_UNION),
+        ("simpsonsua", AudioSource.SIMPSONS_UA),
+        ("simpsonsua.tv", AudioSource.SIMPSONS_UA),
+        ("slava radyk", AudioSource.SLAVA_RADYK),
+        ("slavaradyk", AudioSource.SLAVA_RADYK),
+        ("starfall", AudioSource.STARFALL),
+        ("стб", AudioSource.STB),
+        ("cтруґачка", AudioSource.STRUGACHKA),
+        ("15k3", AudioSource.STUDIO_15K3),
+        ("15к3", AudioSource.STUDIO_15K3),
+        ("sunnysiders", AudioSource.SUNNYSIDERS),
+        ("суспільне культура", AudioSource.SUSPILNE_KULTURA),
+        ("суспільнекультура", AudioSource.SUSPILNE_KULTURA),
+        ("культура", AudioSource.SUSPILNE_KULTURA),
+        ("vhs record", AudioSource.SWEET_SOUND_STUDIO),
+        ("sweet", AudioSource.SWEET_SOUND_STUDIO),
+        ("тактребапродакшн", AudioSource.TAK_TREBA_PRODUCTION),
+        ("так треба продакшн", AudioSource.TAK_TREBA_PRODUCTION),
+        ("тет", AudioSource.TET),
+        ("tet", AudioSource.TET),
+        ("tretyakoff", AudioSource.TRETYAKOFF),
+        ("цікава ідея", AudioSource.TSIKAVA_IDEYA),
+        ("цікаваідея", AudioSource.TSIKAVA_IDEYA),
+        ("tv5", AudioSource.TV5),
+        ("твій продакшн", AudioSource.TVIY_PRODUCTION),
+        ("твоє кіно", AudioSource.TVOYE_KINO_RELAX_HD),
+        ("твоєкіно", AudioSource.TVOYE_KINO_RELAX_HD),
+        ("2+2", AudioSource.TWO_PLUS_TWO),
+        ("uaflix", AudioSource.UAFLIX),
+        ("uateam", AudioSource.UATEAM),
+        ("ufdub", AudioSource.UFDUB),
+        ("україна", AudioSource.UKRAINA),
+        ("vhsrecord", AudioSource.VHS_RECORD),
+        ("cine+", AudioSource.VOLYA_CINE_PLUS),
+        ("в одне рило", AudioSource.V_ODNE_RYLO),
+        ("воднерило", AudioSource.V_ODNE_RYLO),
+    ],
+    key=lambda t: -len(t[0]),
+)
 
 
 def _detect_audio_type(title: str) -> AudioType:
     t = title.lower()
-    if "dub" in t or "\u0434\u0443\u0431\u043b\u044f\u0436" in t:
+    if "dub" in t or "дубляж" in t:
         return AudioType.DUB
-    if (
-        "mvo" in t
-        or "\u0431\u0430\u0433\u0430\u0442\u043e\u0433\u043e\u043b\u043e\u0441\u0438\u0439" in t
-    ):
+    if "mvo" in t or "багатоголосий" in t:
         return AudioType.MVO
     if "dvo" in t:
         return AudioType.DVO
     if "svo" in t:
         return AudioType.SVO
-    if "original" in t or "\u043e\u0440\u0438\u0433\u0456\u043d\u0430\u043b" in t or "eng" in t:
+    if "original" in t or "оригінал" in t or "eng" in t:
         return AudioType.ORIGINAL
     return AudioType.UNKNOWN
 
 
 def _detect_studio(title: str) -> AudioSource | None:
     t = title.lower()
+    for keyword, source in _STUDIO_MAP:
+        if keyword == t.split("|")[-1].strip():
+            return source
     for keyword, source in _STUDIO_MAP:
         if keyword in t:
             return source
@@ -443,15 +478,53 @@ def parse_subtitle_langs(
     return list(langs)
 
 
-# ---------------------------------------------------------------------------
-# Client
-# ---------------------------------------------------------------------------
+_EPISODE_PATTERNS = [
+    r"s\d+.?e(\d+)",  # S01E05
+    r"\be(\d+)",  # E05
+    r"\dx(\d+)",  # 1x05
+    r"[^/](\d+)",  # dotted notation
+]
+
+
+def _try_pattern(pattern: str, files: list[str]) -> dict[str, int] | None:
+    results: dict[str, int] = {}
+    for f in files:
+        m = re.findall(pattern, f, re.IGNORECASE)
+        if m:
+            results[f] = int(m[0])
+    if len(results) == len(files) and len(set(results.values())) == len(files):
+        return results
+    return None
+
+
+def _positional(files: list[str]) -> dict[str, int] | None:
+    if len(files) <= 1:
+        return None
+    all_nums = [re.findall(r"\d+", f) for f in files]
+    if len(set(len(n) for n in all_nums)) != 1:
+        return None
+    for col in range(len(all_nums[0])):
+        vals = [int(n[col]) for n in all_nums]
+        if len(set(vals)) == len(files):
+            return {f: int(n[col]) for f, n in zip(files, all_nums)}
+    return None
+
+
+def extract_episode_numbers(basenames: list[str]) -> dict[str, int] | None:
+    """Map video basenames → episode number. Returns None if no pattern matches."""
+    for pat in _EPISODE_PATTERNS:
+        result = _try_pattern(pat, basenames)
+        if result:
+            return result
+    return _positional(basenames)
+
+
 class UtpClient:
     """Async client for the utp.to unit3D API."""
 
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
-        self._client = httpx.AsyncClient(timeout=30)
+        self._client = httpx.AsyncClient(base_url=_BASE_URL, timeout=30)
 
     async def search(
         self,
@@ -489,13 +562,22 @@ class UtpClient:
                 params[f"categories[{i}]"] = str(cat_id)
 
         try:
-            resp = await self._client.get(_BASE_URL, params=params)
+            resp = await self._client.get("/filter", params=params)
             resp.raise_for_status()
             data = resp.json()
             return data.get("data", data) if isinstance(data, dict) else data
         except httpx.HTTPError:
             log.exception("UTP API request failed")
             return []
+
+    async def get_by_id(self, torrent_id: str) -> dict | None:
+        try:
+            resp = await self._client.get(f"/{torrent_id}", params={"api_token": self._api_key})
+            resp.raise_for_status()
+            return transform_utp_item(resp.json())
+        except httpx.HTTPError:
+            log.exception("UTP get_by_id failed for id=%s", torrent_id)
+            return None
 
     async def close(self) -> None:
         await self._client.aclose()

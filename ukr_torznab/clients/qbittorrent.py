@@ -1,6 +1,8 @@
 import logging
 
 import httpx
+from httpx_limiter import AsyncRateLimitedTransport, Rate
+from httpx_limiter.aiolimiter import AiolimiterAsyncLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +12,12 @@ class QBittorrentClient:
         self._url = url.rstrip("/")
         self._username = username
         self._password = password
-        self._client = httpx.AsyncClient(timeout=30)
+        self._client = httpx.AsyncClient(
+            timeout=30,
+            transport=AsyncRateLimitedTransport.create(
+                AiolimiterAsyncLimiter.create(Rate.create(1, 1)),
+            ),
+        )
 
     async def login(self) -> None:
         resp = await self._client.post(
@@ -22,13 +29,21 @@ class QBittorrentClient:
             raise RuntimeError("qBittorrent login failed: bad credentials")
         logger.info("qBittorrent login OK")
 
-    async def get_paused_torrents(self) -> list[dict]:
+    async def get_stopped_torrents(self, categories) -> list[dict]:
         resp = await self._client.get(
             f"{self._url}/api/v2/torrents/info",
-            params={"filter": "paused"},
+            params={"filter": "stopped"},
         )
         resp.raise_for_status()
-        return resp.json()
+        torrents = []
+        for torrent in resp.json():
+            if torrent["category"] not in categories:
+                continue
+            tags = [t.strip() for t in torrent["tags"].split(",") if t.strip()]
+            if "renamed" in tags:
+                continue
+            torrents.append(torrent)
+        return torrents
 
     async def get_torrent_files(self, hash: str) -> list[dict]:
         resp = await self._client.get(
@@ -52,9 +67,23 @@ class QBittorrentClient:
         )
         resp.raise_for_status()
 
-    async def resume(self, hash: str) -> None:
+    async def add_tags(self, hash: str, tags: list[str]) -> None:
         resp = await self._client.post(
-            f"{self._url}/api/v2/torrents/resume",
+            f"{self._url}/api/v2/torrents/addTags",
+            data={"hashes": hash, "tags": ",".join(tags)},
+        )
+        resp.raise_for_status()
+
+    async def rename_folder(self, hash: str, old_path: str, new_path: str) -> None:
+        resp = await self._client.post(
+            f"{self._url}/api/v2/torrents/renameFolder",
+            data={"hash": hash, "oldPath": old_path, "newPath": new_path},
+        )
+        resp.raise_for_status()
+
+    async def start(self, hash: str) -> None:
+        resp = await self._client.post(
+            f"{self._url}/api/v2/torrents/start",
             data={"hashes": hash},
         )
         resp.raise_for_status()

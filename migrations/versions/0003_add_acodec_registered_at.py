@@ -28,7 +28,7 @@ def upgrade() -> None:
                 sa.DateTime(timezone=True),
                 nullable=False,
                 server_default=_EPOCH,
-            )
+            ),
         )
 
     op.execute(f"UPDATE release SET registered_at = '{_EPOCH}'")
