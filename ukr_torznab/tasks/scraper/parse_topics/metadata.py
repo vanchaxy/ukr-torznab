@@ -124,7 +124,7 @@ def detect_audio_sources(html_lower: str, text: str) -> set[AudioSource]:
             found.add(source)
     title_rows = (
         re.findall(
-            r"(?i)(?:Audio|Аудіо)(?:\s+#\d+)?(?:(?!(?:Text|Текст)(?:\s+#\d+)?)[\s\S])*?(?<!Комерційна.)(?:Title|Назва)\s*:\s*([^\r\n]+)",
+            r"(?i)(?:Audio|Аудіо)(?:\s+#\d+)?(?:(?!(?:Text|Текст)(?:\s+#\d+)?)[\s\S])*?(?<!Комерційна.)(?:Title|Назва|Заголовок)\s*:\s*([^\r\n]+)",
             text,
         )
         + re.findall(r".*переклад:(.+)", text)
