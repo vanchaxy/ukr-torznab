@@ -323,8 +323,8 @@ def audio_source_tag(audio_sources_json: str | None) -> str:
 
 
 def _group_tag(row: dict) -> str:
-    g = row.get("release_group") or row.get("author")
-    return _sanitize(str(g)) if g else ""
+    g = row.get("release_group") or row.get("author") or ""
+    return re.sub(r"[^0-9a-z]", "", g.lower())
 
 
 def _build_parts(
@@ -333,18 +333,14 @@ def _build_parts(
     season: int | None = None,
     episode: int | None = None,
 ) -> list[str]:
-    parts: list[str] = []
-
-    if row.get("title"):
-        parts.append(_sanitize(row["title"]))
+    parts: list[str] = [_sanitize(row["title"])]
 
     if season is not None and episode is not None:
         parts.append(f"S{season:02d}E{episode:02d}")
     elif season is not None:
         parts.append(f"S{season:02d}")
 
-    if row.get("year"):
-        parts.append(str(row["year"]))
+    parts.append(str(row.get("year", 1800)))
 
     if row.get("cut"):
         parts.append(row["cut"])
