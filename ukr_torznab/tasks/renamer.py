@@ -73,6 +73,8 @@ class RenameTorrentsTask(AbstractTask):
                 toloka_hashes.append(qbt_hash)
 
         for qbt_hash, utp_id in utp_torrents:
+            if not self.running:
+                return
             if self.utp_client is None:
                 logger.warning("UTP torrent id=%s skipped: no UTP client configured", utp_id)
                 continue
@@ -80,16 +82,20 @@ class RenameTorrentsTask(AbstractTask):
                 row = await self.utp_client.get_by_id(utp_id)
                 if row is None:
                     logger.warning("UTP torrent id=%s not found via API, skipping", utp_id)
+                    await self.qbt_client.add_tags(qbt_hash, ["rename-error"])
                     continue
                 await self._rename_and_start(row, qbt_hash)
             except Exception:
                 logger.exception("Failed to rename UTP torrent id=%s hash=%s", utp_id, qbt_hash)
+                await self.qbt_client.add_tags(qbt_hash, ["rename-error"])
 
         if toloka_hashes:
             sha256_to_qbt = {_sha256_of_sha1(h): h for h in toloka_hashes}
             async with self.engine.connect() as conn:
                 rows = await get_releases_by_infohash(conn, list(sha256_to_qbt.keys()))
             for row in rows:
+                if not self.running:
+                    return
                 qbt_hash = sha256_to_qbt.get(row["infohash_sha256"])
                 if not qbt_hash:
                     continue
@@ -97,8 +103,12 @@ class RenameTorrentsTask(AbstractTask):
                     await self._rename_and_start(row, qbt_hash)
                 except Exception:
                     logger.exception("Failed to rename torrent %s hash=%s", row["id"], qbt_hash)
+                    await self.qbt_client.add_tags(qbt_hash, ["rename-error"])
 
-        await asyncio.sleep(60)
+        for _ in range(60):
+            if not self.running:
+                return
+            await asyncio.sleep(1)
 
     async def _rename_and_start(self, row: dict, qbt_hash: str) -> None:
         is_tv = row.get("content_type") == "tv"
@@ -199,12 +209,14 @@ class RenameTorrentsTask(AbstractTask):
             new_basename = release_name(row) + ext
 
         if old_folder:
-            await self.qbt_client.rename_folder(qbt_hash, old_folder, new_folder)
-            await self.qbt_client.rename_file(
-                qbt_hash,
-                f"{new_folder}/{old_basename}",
-                f"{new_folder}/{new_basename}",
-            )
+            if old_basename != new_basename:
+                await self.qbt_client.rename_file(
+                    qbt_hash,
+                    f"{old_folder}/{old_basename}",
+                    f"{old_folder}/{new_basename}",
+                )
+            if old_folder != new_folder:
+                await self.qbt_client.rename_folder(qbt_hash, old_folder, new_folder)
         else:
             await self.qbt_client.rename_file(qbt_hash, old_path, new_basename)
 
@@ -219,12 +231,6 @@ class RenameTorrentsTask(AbstractTask):
         seasons = list({v[0] for v in file_to_episode.values()})
         new_folder = tv_folder(row, seasons=seasons or None)
 
-        if old_folder:
-            await self.qbt_client.rename_folder(qbt_hash, old_folder, new_folder)
-            folder_prefix = new_folder
-        else:
-            folder_prefix = None
-
         for f in video_files:
             old_path = f.get("name", "")
             old_basename = PurePosixPath(old_path).name
@@ -234,12 +240,15 @@ class RenameTorrentsTask(AbstractTask):
             new_basename = episode_filename(row, s, e, os.path.splitext(old_basename)[1])
             if old_basename == new_basename:
                 continue
-            if folder_prefix:
+            if old_folder:
                 await self.qbt_client.rename_file(
                     qbt_hash,
-                    f"{folder_prefix}/{old_basename}",
-                    f"{folder_prefix}/{new_basename}",
+                    f"{old_folder}/{old_basename}",
+                    f"{old_folder}/{new_basename}",
                 )
             else:
                 await self.qbt_client.rename_file(qbt_hash, old_path, new_basename)
             logger.debug("  file: %r → %r", old_basename, new_basename)
+
+        if old_folder and old_folder != new_folder:
+            await self.qbt_client.rename_folder(qbt_hash, old_folder, new_folder)

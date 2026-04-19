@@ -8,6 +8,8 @@ import re
 from collections import defaultdict
 
 import httpx
+from httpx_limiter import AsyncRateLimitedTransport, Rate
+from httpx_limiter.aiolimiter import AiolimiterAsyncLimiter
 
 from ukr_torznab.enums import (
     AspectRatio,
@@ -553,7 +555,13 @@ class UtpClient:
 
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
-        self._client = httpx.AsyncClient(base_url=_BASE_URL, timeout=30)
+        self._client = httpx.AsyncClient(
+            base_url=_BASE_URL,
+            timeout=30,
+            transport=AsyncRateLimitedTransport.create(
+                AiolimiterAsyncLimiter.create(Rate.create(1, 1)),
+            ),
+        )
 
     async def search(
         self,

@@ -40,7 +40,7 @@ class QBittorrentClient:
             if torrent["category"] not in categories:
                 continue
             tags = [t.strip() for t in torrent["tags"].split(",") if t.strip()]
-            if "renamed" in tags:
+            if "renamed" in tags or "rename-error" in tags:
                 continue
             torrents.append(torrent)
         return torrents
