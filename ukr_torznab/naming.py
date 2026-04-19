@@ -182,7 +182,7 @@ _AUDIO_SOURCE_DISPLAY: dict[AudioSource, str] = {
     AudioSource.INARI: "Inari",
     AudioSource.INDIGO: "Indigo",
     AudioSource.INTER: "Inter",
-    AudioSource.ITUNES: "iTunes",
+    AudioSource.ITUNES: "AppleTV",
     AudioSource.K1: "K1",
     AudioSource.KINO: "Kino",
     AudioSource.KINOTA: "Kinota",
