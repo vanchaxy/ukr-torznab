@@ -399,11 +399,11 @@ def release_name(row: dict, *, xseed: bool = False) -> str:
     ep = last_ep if (season is not None and not season_complete and last_ep is not None) else None
 
     parts = _build_parts(row, season=season, episode=ep)
-    base = " ".join(parts)
+    base = " ".join(parts) + '-'
     if xseed:
         return base
     group = _group_tag(row)
-    return f"{base}-{group}" if group else base
+    return base + group if group else base
 
 
 def tv_folder(row: dict, *, seasons: list[int] | None = None) -> str:
