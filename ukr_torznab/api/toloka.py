@@ -25,6 +25,7 @@ async def torznab_api(
     ep: int | None = None,
     offset: int = 0,
     limit: int = DEFAULT_LIMIT,
+    xseed: int = 0,
 ) -> Response:
     if t == "caps":
         return caps_response("Toloka Torznab")
@@ -59,8 +60,7 @@ async def torznab_api(
             limit=limit,
         )
 
-    base_url = str(request.base_url).rstrip("/")
-    return build_rss(rows, base_url, source="toloka")
+    return build_rss(rows, source="toloka", xseed=bool(xseed))
 
 
 @router.get("/download/{download_id}")

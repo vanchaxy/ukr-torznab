@@ -72,7 +72,7 @@ def content_type_filter(
     return list(types) if types else None
 
 
-def build_rss(items: list[dict], base_url: str, *, source: str) -> Response:
+def build_rss(items: list[dict], *, source: str, xseed: bool = False) -> Response:
     channel_title = "Toloka Torznab" if source == "toloka" else "UTP Torznab"
 
     rss = etree.Element("rss", nsmap={"torznab": _TORZNAB_NS})
@@ -83,7 +83,7 @@ def build_rss(items: list[dict], base_url: str, *, source: str) -> Response:
     for item in items:
         el = etree.SubElement(channel, "item")
 
-        etree.SubElement(el, "title").text = release_name(item)
+        etree.SubElement(el, "title").text = release_name(item, xseed=xseed)
 
         guid_el = etree.SubElement(el, "guid")
         guid_el.set("isPermaLink", "false")

@@ -55,10 +55,6 @@ class RenameTorrentsTask(AbstractTask):
 
     async def run_once(self) -> None:
         stopped = await self.qbt_client.get_stopped_torrents(categories=["movies", "tv"])
-        for _ in range(60):
-            if not self.running:
-                return
-            await asyncio.sleep(1)
 
         utp_torrents: list[tuple[str, str]] = []  # (qbt_hash, utp_id)
         toloka_hashes: list[str] = []

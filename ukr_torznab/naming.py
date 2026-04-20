@@ -389,7 +389,7 @@ def _build_parts(
     return parts
 
 
-def release_name(row: dict) -> str:
+def release_name(row: dict, *, xseed: bool = False) -> str:
     season = row.get("season")
     last_ep = row.get("last_episode")
     season_complete = row.get("season_complete")
@@ -397,6 +397,8 @@ def release_name(row: dict) -> str:
 
     parts = _build_parts(row, season=season, episode=ep)
     base = " ".join(parts)
+    if xseed:
+        return base
     group = _group_tag(row)
     return f"{base}-{group}" if group else base
 

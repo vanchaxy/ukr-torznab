@@ -28,6 +28,7 @@ async def utp_torznab_api(
     ep: int | None = None,
     offset: int = 0,
     limit: int = DEFAULT_LIMIT,
+    xseed: int = 0,
 ) -> Response:
     if t == "caps":
         return caps_response("UTP Torznab")
@@ -77,5 +78,4 @@ async def utp_torznab_api(
 
     items = [transform_utp_item(it) for it in raw_items]
 
-    base_url = str(request.base_url).rstrip("/")
-    return build_rss(items, base_url, source="utp")
+    return build_rss(items, source="utp", xseed=bool(xseed))
