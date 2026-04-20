@@ -229,7 +229,7 @@ _AUDIO_SOURCE_DISPLAY: dict[AudioSource, str] = {
     AudioSource.STRUGACHKA: "Strugachka",
     AudioSource.STUDIO_15K3: "15K3",
     AudioSource.SUB_AUTUMN: "SubAutumn",
-    AudioSource.SUNNYSIDERS: "Іunnysiders",
+    AudioSource.SUNNYSIDERS: "Sunnysiders",
     AudioSource.SUSPILNE_KULTURA: "SuspilneKultura",
     AudioSource.SWEET_SOUND_STUDIO: "SweetSoundStudio",
     AudioSource.TAK_TREBA_PRODUCTION: "TakTrebaProduction",
