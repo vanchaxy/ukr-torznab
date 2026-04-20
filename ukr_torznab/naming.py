@@ -335,12 +335,15 @@ def _build_parts(
 ) -> list[str]:
     parts: list[str] = [_sanitize(row["title"])]
 
-    if season is not None and episode is not None:
-        parts.append(f"S{season:02d}E{episode:02d}")
-    elif season is not None:
-        parts.append(f"S{season:02d}")
+    if row.get("content_type") == 'tv':
+        safe_season = season if season is not None else 1
+        if episode is not None:
+            parts.append(f"S{safe_season:02d}E{episode:02d}")
+        else:
+            parts.append(f"S{safe_season:02d}")
 
-    parts.append(str(row.get("year", 1800)))
+    if row.get("content_type") == 'movie':
+        parts.append(str(row.get("year", 1800)))
 
     if row.get("cut"):
         parts.append(row["cut"])
@@ -354,13 +357,13 @@ def _build_parts(
     if row.get("hybrid"):
         parts.append("Hybrid")
 
-    src = source_tag(row.get("quality"))
-    if src:
-        parts.append(src)
-
     res = row.get("resolution")
     if res and res != "unknown":
         parts.append(res)
+
+    src = source_tag(row.get("quality"))
+    if src:
+        parts.append(src)
 
     cc = codec_tag(row.get("codec"))
     if cc:
