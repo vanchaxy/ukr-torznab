@@ -21,7 +21,7 @@ from ukr_torznab.models import (
     Tracker,
 )
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def dvf(freeleech) -> str:
@@ -85,7 +85,7 @@ class UtpClient:
             data = resp.json()
             return [transform_utp_item(it) for it in data.get("data", [])]
         except httpx.HTTPError:
-            log.exception("UTP API request failed")
+            logger.exception("UTP API request failed")
             return []
 
     async def get_by_id(self, torrent_id: str) -> Release | None:
@@ -94,7 +94,7 @@ class UtpClient:
             resp.raise_for_status()
             return transform_utp_item(resp.json())
         except httpx.HTTPError:
-            log.exception("UTP get_by_id failed for id=%s", torrent_id)
+            logger.exception("UTP get_by_id failed for id=%s", torrent_id)
             return None
 
     async def close(self) -> None:

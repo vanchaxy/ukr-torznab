@@ -27,6 +27,8 @@ from ukr_torznab.settings import (
 )
 from ukr_torznab.tasks.base import AbstractTask
 
+logger = logging.getLogger(__name__)
+
 _MIGRATIONS_DIR = Path(__file__).parent.parent / "migrations"
 
 
@@ -67,7 +69,7 @@ async def main():
         from ukr_torznab.clients.utp import UtpClient
 
         utp_client = UtpClient(api_key=UTP_API_KEY)
-        logging.getLogger(__name__).info("UTP client enabled")
+        logger.info("UTP client enabled")
     api_app.state.utp_client = utp_client
 
     tasks: list[AbstractTask] = []
@@ -77,7 +79,7 @@ async def main():
     openai_client = None
 
     if ELECTRIC_URL:
-        logging.getLogger(__name__).info(
+        logger.info(
             "Starting in consumer mode (ELECTRIC_URL=%s)",
             ELECTRIC_URL,
         )
@@ -94,7 +96,7 @@ async def main():
                 ),
             )
     else:
-        logging.getLogger(__name__).info("Starting in scraper mode")
+        logger.info("Starting in scraper mode")
         from openai import AsyncOpenAI
 
         from ukr_torznab.clients.servarr import ServarrClient

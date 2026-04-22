@@ -68,5 +68,3 @@ TOLOKA_CATEGORIES = [
     "137",  # Мультфільми та мультсеріали в DVD
     "138",  # Документальні фільми в DVD
 ]
-
-VIDEO_EXTENSIONS = []

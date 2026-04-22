@@ -239,7 +239,8 @@ class Release:
             parts.append(self.resolution.value)
 
         parts.append(str(self.quality))
-        parts.append(str(self.codec))
+        if self.quality is not Quality.BR_DISK:
+            parts.append(str(self.codec))
 
         if self.hdr is not VideoFormat.SDR:
             parts.append(self.hdr.value.upper().replace("-", " "))
