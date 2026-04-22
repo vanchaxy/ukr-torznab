@@ -270,6 +270,7 @@ async def get_releases_by_infohash(
         select(
             release.c.id,
             topic.c.name,
+            topic.c.download_id,
             release.c.title,
             release.c.year,
             release.c.content_type,

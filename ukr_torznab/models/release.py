@@ -271,11 +271,11 @@ class Release:
             episode=self.min_episode,
             end_episode=self.max_episode,
         )
-        base = " ".join(parts) + "-"
+        base = " ".join(parts)
         if xseed:
-            return base
+            return base + "-"
         group = self.group_tag()
-        return f"{base}{group}" if group else base
+        return f"{base}-{group}" if group else base
 
     def movie_folder(self) -> str:
         parts = self.release_name_parts(release_id=self.id)
@@ -293,4 +293,4 @@ class Release:
         parts = self.release_name_parts(season=season, episode=episode)
         base = " ".join(parts)
         group = self.group_tag()
-        return f"{base}-{group}" if group else base
+        return f"{base}-{group}{ext}" if group else base

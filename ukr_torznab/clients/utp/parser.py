@@ -331,7 +331,11 @@ def parse_audio_tracks(
         if studio is not None:
             audio_sources.add(studio)
 
-    return list(audio_types), list(audio_sources), list(audio_langs)
+    return (
+        sorted(audio_types, key=lambda l: l.value),
+        sorted(audio_sources, key=lambda l: l.name),
+        sorted(audio_langs, key=lambda l: l.value),
+    )
 
 
 def parse_subtitle_langs(
@@ -341,4 +345,4 @@ def parse_subtitle_langs(
     for track in mediainfo.get("Text", []):
         lang = _parse_lang(track.get("Language", ""))
         langs.add(lang)
-    return list(langs)
+    return sorted(langs, key=lambda l: l.value)
