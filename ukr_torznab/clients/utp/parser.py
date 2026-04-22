@@ -173,7 +173,7 @@ def parse_release(name: str, type: str, resolution: str, files: list, is_tv: boo
             min_episode = max_episode = int(sm.group(2)) if sm.group(2) else None
         else:
             season = 1
-        season_complete = min_episode is None or SEASON_PART_RE.search(name, 0, qpos)
+        season_complete = min_episode is None and not SEASON_PART_RE.search(name, 0, qpos)
         file_to_episode = build_file_to_episode(season, files)
         if file_to_episode and not season_complete:
             eps = [v[1] for v in file_to_episode.values() if v[0] == season]
