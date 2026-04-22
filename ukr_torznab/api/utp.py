@@ -1,18 +1,15 @@
-"""UTP Torznab API route handlers — proxies requests to utp.to unit3D API."""
-
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from ukr_torznab.api.caps import DEFAULT_LIMIT, MAX_LIMIT, caps_response
 from ukr_torznab.api.search import build_rss, content_type_filter, parse_imdbid
 from ukr_torznab.api.xml import error_xml
-from ukr_torznab.clients.utp import UtpClient, transform_utp_item
+from ukr_torznab.clients.utp import UtpClient
 
 router = APIRouter(prefix="/utp")
 
-# unit3D category IDs: 1 = Movies, 2 = TV
-_UTP_CAT_MOVIE = 1
-_UTP_CAT_TV = 2
+UTP_CAT_MOVIE = 1
+UTP_CAT_TV = 2
 
 
 @router.get("/api")
@@ -36,7 +33,7 @@ async def utp_torznab_api(
     if t not in ("search", "tvsearch", "movie"):
         return error_xml(202, "No such function")
 
-    utp_client: UtpClient | None = getattr(request.app.state, "utp_client", None)
+    utp_client: UtpClient | None = request.app.state.utp_client
     if utp_client is None:
         return error_xml(900, "UTP client not configured (set UTP_API_KEY)")
 
@@ -49,14 +46,13 @@ async def utp_torznab_api(
         force_movie=(t == "movie"),
     )
 
-    # Map content_types to unit3D category IDs
     categories: list[int] | None = None
     if content_types:
         categories = []
         if "tv" in content_types:
-            categories.append(_UTP_CAT_TV)
+            categories.append(UTP_CAT_TV)
         if "movie" in content_types:
-            categories.append(_UTP_CAT_MOVIE)
+            categories.append(UTP_CAT_MOVIE)
 
     parsed_imdbid = parse_imdbid(imdbid)
     parsed_tvdbid = int(tvdbid) if tvdbid and tvdbid.isdigit() else None
@@ -64,7 +60,7 @@ async def utp_torznab_api(
 
     page = (offset // limit) + 1
 
-    raw_items = await utp_client.search(
+    items = await utp_client.search(
         name=q,
         imdb_id=parsed_imdbid,
         tvdb_id=parsed_tvdbid,
@@ -76,6 +72,4 @@ async def utp_torznab_api(
         page=page,
     )
 
-    items = [transform_utp_item(it) for it in raw_items]
-
-    return build_rss(items, source="utp", xseed=bool(xseed))
+    return build_rss(items, title="UTP Torznab", xseed=bool(xseed))

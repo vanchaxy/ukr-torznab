@@ -1,17 +1,15 @@
-"""Torznab capabilities response."""
-
 from fastapi.responses import Response
 from lxml import etree
 
 from ukr_torznab.api.xml import xml_response
 
 DEFAULT_LIMIT = 100
-MAX_LIMIT = 200
+MAX_LIMIT = 100
 CAT_TV = "5000"
 CAT_MOVIE = "2000"
 
 
-def caps_response(title: str = "Toloka Torznab") -> Response:
+def caps_response(title: str) -> Response:
     caps = etree.Element("caps")
 
     server = etree.SubElement(caps, "server")
@@ -36,8 +34,8 @@ def caps_response(title: str = "Toloka Torznab") -> Response:
 
     categories = etree.SubElement(caps, "categories")
     for cat_id, cat_name in ((CAT_TV, "TV"), (CAT_MOVIE, "Movies")):
-        cat_el = etree.SubElement(categories, "category")
-        cat_el.set("id", cat_id)
-        cat_el.set("name", cat_name)
+        el = etree.SubElement(categories, "category")
+        el.set("id", cat_id)
+        el.set("name", cat_name)
 
     return xml_response(caps)

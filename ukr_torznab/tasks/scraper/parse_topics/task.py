@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 from datetime import datetime
@@ -42,10 +41,7 @@ class ParseTopicsTask(AbstractTask):
                 logger.warning(
                     "imdb_titles table is empty, skipping parse — waiting for RefreshImdbTask",
                 )
-                for _ in range(60):
-                    if not self.running:
-                        return
-                    await asyncio.sleep(1)
+                await self.interruptible_sleep(60)
                 return
             logger.info("imdb_titles table is ready (%d rows)", imdb_count)
             self._imdb_ready = True
@@ -54,10 +50,7 @@ class ParseTopicsTask(AbstractTask):
             rows = await get_page_to_parse(conn)
             if not rows:
                 logger.info("No pages to parse, sleeping")
-                for _ in range(60):
-                    if not self.running:
-                        return
-                    await asyncio.sleep(1)
+                await self.interruptible_sleep(60)
                 return
 
             logger.info("Parsing %d pages", len(rows))

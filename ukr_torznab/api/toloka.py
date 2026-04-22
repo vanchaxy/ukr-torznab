@@ -1,5 +1,3 @@
-"""Toloka Torznab API route handlers."""
-
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -60,7 +58,7 @@ async def torznab_api(
             limit=limit,
         )
 
-    return build_rss(rows, source="toloka", xseed=bool(xseed))
+    return build_rss(rows, title="Toloka Torznab", xseed=bool(xseed))
 
 
 @router.get("/download/{download_id}")

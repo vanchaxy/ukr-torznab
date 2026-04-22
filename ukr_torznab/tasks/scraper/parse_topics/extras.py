@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import re
 
-from ukr_torznab.enums import AspectRatio, VideoFormat
+from ukr_torznab.models import AspectRatio, VideoFormat
 
 _HDR_ROW_RE = re.compile(
     r"(?:hdr.format|формат.hdr|commercial.name|комерційна.назва"

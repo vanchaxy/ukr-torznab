@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 from ukr_torznab.db.tables import page, release, topic
 from ukr_torznab.db.upsert import upsert
+from ukr_torznab.models import Release
 
 PARSER_VERSION = 7
 
@@ -183,7 +184,7 @@ async def search_releases(
     episode: int | None = None,
     offset: int = 0,
     limit: int = 100,
-) -> list[dict]:
+) -> list[Release]:
     query = (
         select(
             topic.c.id,
@@ -193,6 +194,7 @@ async def search_releases(
             topic.c.seeders,
             topic.c.leechers,
             release.c.content_type,
+            release.c.content_type,
             release.c.imdb_id,
             release.c.tvdb_id,
             release.c.tmdb_id,
@@ -200,7 +202,7 @@ async def search_releases(
             release.c.year,
             release.c.season,
             release.c.season_complete,
-            release.c.last_episode,
+            release.c.file_to_episode,
             release.c.torrent_size,
             release.c.quality,
             release.c.resolution,
@@ -257,36 +259,54 @@ async def search_releases(
             ),
         )
     query = query.order_by(release.c.registered_at.desc()).offset(offset).limit(limit)
-    return [dict(row._mapping) for row in (await conn.execute(query)).fetchall()]
+    return [Release.from_db_row(row) for row in (await conn.execute(query)).fetchall()]
 
 
 async def get_releases_by_infohash(
     conn: AsyncConnection,
     infohashes: list[str],
-) -> list[dict]:
-    query = select(
-        release.c.id,
-        release.c.title,
-        release.c.year,
-        release.c.content_type,
-        release.c.season,
-        release.c.season_complete,
-        release.c.file_to_episode,
-        release.c.quality,
-        release.c.resolution,
-        release.c.codec,
-        release.c.audio_types,
-        release.c.audio_sources,
-        release.c.audio_lang,
-        release.c.subtitle_lang,
-        release.c.release_group,
-        release.c.author,
-        release.c.infohash_sha256,
-    ).where(
-        release.c.infohash_sha256.in_(infohashes),
-        release.c.result == "ok",
+) -> list[Release]:
+    query = (
+        select(
+            release.c.id,
+            topic.c.name,
+            release.c.title,
+            release.c.year,
+            release.c.content_type,
+            release.c.imdb_id,
+            release.c.tvdb_id,
+            release.c.tmdb_id,
+            release.c.season,
+            release.c.season_complete,
+            release.c.last_episode,
+            release.c.file_to_episode,
+            release.c.torrent_size,
+            release.c.quality,
+            release.c.resolution,
+            release.c.codec,
+            release.c.hdr,
+            release.c.cut,
+            release.c.ratio,
+            release.c.hybrid,
+            release.c.audio_types,
+            release.c.audio_sources,
+            release.c.audio_lang,
+            release.c.subtitle_lang,
+            release.c.release_group,
+            release.c.author,
+            release.c.registered_at,
+            release.c.infohash_sha256,
+            topic.c.seeders,
+            topic.c.leechers,
+            topic.c.hash_changed_at,
+        )
+        .join(topic, release.c.id == topic.c.id)
+        .where(
+            release.c.infohash_sha256.in_(infohashes),
+            release.c.result == "ok",
+        )
     )
-    return [dict(r._mapping) for r in (await conn.execute(query)).fetchall()]
+    return [Release.from_db_row(r) for r in (await conn.execute(query)).fetchall()]
 
 
 async def upsert_release(

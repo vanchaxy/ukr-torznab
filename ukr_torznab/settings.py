@@ -14,6 +14,11 @@ API_PORT: int = int(os.environ.get("API_PORT", "8000"))
 QBITTORRENT_URL: str | None = os.environ.get("QBITTORRENT_URL")
 QBITTORRENT_USERNAME: str = os.environ.get("QBITTORRENT_USERNAME", "admin")
 QBITTORRENT_PASSWORD: str = os.environ.get("QBITTORRENT_PASSWORD", "adminadmin")
+QBITTORRENT_CATEGORIES: set[str] = {
+    c.strip() for c in os.environ.get("QBITTORRENT_CATEGORIES", "tv,movies").split(",") if c.strip()
+}
+QBITTORRENT_RENAME_TAG: str = os.environ.get("QBITTORRENT_RENAME_TAG", "renamed")
+QBITTORRENT_RENAME_ERROR_TAG: str = os.environ.get("QBITTORRENT_RENAME_ERROR_TAG", "rename-error")
 
 TOLOKA_USERNAME = os.environ["TOLOKA_USERNAME"]
 TOLOKA_PASSWORD = os.environ["TOLOKA_PASSWORD"]
@@ -63,3 +68,5 @@ TOLOKA_CATEGORIES = [
     "137",  # Мультфільми та мультсеріали в DVD
     "138",  # Документальні фільми в DVD
 ]
+
+VIDEO_EXTENSIONS = []

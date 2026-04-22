@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum, auto
 from pathlib import Path
 
-from ukr_torznab.enums import (
+from ukr_torznab.models import (
     AspectRatio,
     AudioSource,
     AudioType,
@@ -13,23 +12,32 @@ from ukr_torznab.enums import (
     Lang,
     Quality,
     Resolution,
-    SkipReason,
     VideoFormat,
 )
 
 
+class SkipReason(Enum):
+    UNEXPECTED_PAGE_STRUCTURE = auto()
+    INVALID_TORRENT = auto()
+    DISALLOWED_FILE_EXTENSION = auto()
+    NO_VIDEO_FILES = auto()
+    NO_IMDB_LINK = auto()
+    IMDB_NOT_IN_DATABASE = auto()
+    TV_NO_SKYHOOK_METADATA = auto()
+    MOVIE_NO_SERVARR_METADATA = auto()
+    MOVIE_MULTIPLE_VIDEO_FILES = auto()
+    INCONSISTENT_FOLDER_STRUCTURE = auto()
+    CANNOT_DETERMINE_SEASON = auto()
+
+
 @dataclass(frozen=True, slots=True)
 class SkippedPage:
-    """A page that was examined but not included in the dataset."""
-
     page_id: int
     reason: SkipReason
 
 
 @dataclass(slots=True)
 class ParsedPage:
-    """All structured metadata extracted from a single Toloka torrent page."""
-
     page_id: int
     imdb_id: int
     title: str  # primary_title from IMDB, falling back to original_title

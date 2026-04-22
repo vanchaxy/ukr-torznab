@@ -18,6 +18,12 @@ class AbstractTask(abc.ABC):
         if self.running:
             await self.task
 
+    async def interruptible_sleep(self, seconds: int):
+        for _ in range(seconds):
+            if not self.running:
+                return
+            await asyncio.sleep(1)
+
     async def _run(self):
         while self.running:
             try:

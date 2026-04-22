@@ -1,10 +1,17 @@
-from __future__ import annotations
-
 import re
+from typing import cast
 
 from decancer_py import parse as decancer_parse
 
-from ukr_torznab.enums import AudioSource, AudioType, CodecFamily, Lang, Quality, Resolution
+from ukr_torznab.models import (
+    LANG_CODE_REVERSE,
+    AudioSource,
+    AudioType,
+    CodecFamily,
+    Lang,
+    Quality,
+    Resolution,
+)
 from ukr_torznab.tasks.scraper.parse_topics.mappings import (
     AUDIO_SOURCE_MAP,
     AUDIO_SOURCE_TITLES_MAP,
@@ -14,11 +21,10 @@ from ukr_torznab.tasks.scraper.parse_topics.mappings import (
     QUALITY_BY_VALUE,
     QUALITY_STRINGS_SORTED,
 )
-from ukr_torznab.tasks.scraper.parse_topics.utils import clean_string
+from ukr_torznab.utils import clean_string
 
 
 def detect_quality(text: str, name: str) -> Quality:
-    """Extract quality/rip-type from the page text, falling back to torrent name."""
     # 1) look in the "якість:" field first
     for match_str in re.findall(r"якість:(.+?)\n", text):
         q = _match_quality_string(match_str)
@@ -45,7 +51,6 @@ _RESOLUTION_RE = re.compile(r"(\d\s*(?:\d\s*){2,3})[xх×*-]\s*((?:\d\s*){2,3}\d
 
 
 def detect_resolution(text: str, name: str) -> Resolution:
-    """Detect video resolution from torrent name or the 'розмір кадру' field."""
     name_lc = name.lower()
     if "2160" in name_lc:
         return Resolution.UHD_2160P
@@ -84,7 +89,6 @@ _CODEC_RE = re.compile(
 
 
 def detect_codec(text: str, html_raw: str) -> CodecFamily:
-    """Extract video codec from the 'кодек:' field or raw HTML fallback."""
     matches = re.findall(r"кодек:.*" + _CODEC_RE.pattern + r".*\n", text, re.IGNORECASE)
     if not matches:
         matches = _CODEC_RE.findall(clean_string(html_raw))
@@ -103,7 +107,6 @@ _AUDIO_KEYWORDS = ("озвучення", "переклад", "мова", "ауд
 
 
 def detect_audio_types(text: str) -> set[AudioType]:
-    """Detect voiceover styles (MVO / DVO / DUB / …) from page text."""
     tracks: set[AudioType] = set()
     for kw in _AUDIO_KEYWORDS:
         if tracks:
@@ -117,7 +120,6 @@ def detect_audio_types(text: str) -> set[AudioType]:
 
 
 def detect_audio_sources(html_lower: str, text: str) -> set[AudioSource]:
-    """Detect dubbing studios / TV channels mentioned in the page HTML."""
     found: set[AudioSource] = set()
     for tag, source in AUDIO_SOURCE_MAP:
         if tag in html_lower:
@@ -172,7 +174,6 @@ _BAN_REGEX = [
 
 
 def detect_release_group(ti_name: str) -> str | None:
-    """Extract release group from torrent name (lowercased)."""
     candidates: list[str] = []
     candidates.extend(re.findall(r"-(\w+)(?:\.\w+)$", ti_name))
     candidates.extend(re.findall(r"\[(\w+)\](?:\.\w+)$", ti_name))
@@ -185,8 +186,23 @@ def detect_release_group(ti_name: str) -> str | None:
     return candidates[0] if candidates else None
 
 
+_AUTHOR_DISALLOWED = re.compile(r"[^a-zа-яіїєґ0-9_-]+")
+
+
+def detect_author(dom) -> str | None:
+    author_raw = str(cast("list", dom.xpath('//span[@class="name"]//text()'))[0]).lower()
+    return _AUTHOR_DISALLOWED.sub("", author_raw) or None
+
+
+def _detect_single_lang(text: str) -> Lang:
+    text_lower = text.lower()
+    for substr, lang in LANG_MAP.items():
+        if substr.lower() in text_lower:
+            return lang
+    return Lang.UNKNOWN
+
+
 def detect_languages(text: str) -> tuple[set[Lang], set[Lang]]:
-    """Return ``(audio_languages, subtitle_languages)``."""
     audio_langs: set[Lang] = set()
     sub_langs: set[Lang] = set()
 
@@ -206,9 +222,13 @@ def detect_languages(text: str) -> tuple[set[Lang], set[Lang]]:
     return audio_langs, sub_langs
 
 
-def _detect_single_lang(text: str) -> Lang:
-    text_lower = text.lower()
-    for substr, lang in LANG_MAP.items():
-        if substr.lower() in text_lower:
-            return lang
-    return Lang.UNKNOWN
+def resolve_original_lang(code: str | None) -> Lang | None:
+    if not code:
+        return None
+    code = code.lower()
+    if len(code) == 3:
+        return LANG_CODE_REVERSE.get(code)
+    try:
+        return Lang(code)
+    except ValueError:
+        return None

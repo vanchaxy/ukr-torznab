@@ -1,5 +1,3 @@
-"""Shared XML primitives and constants for the Torznab API."""
-
 from fastapi.responses import Response
 from lxml import etree
 

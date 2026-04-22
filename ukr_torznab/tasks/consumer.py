@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 from datetime import date, datetime
@@ -17,11 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 def _coerce_row(table: sa.Table, row: dict) -> dict:
-    """Coerce Electric JSON values to Python types expected by SQLAlchemy.
-
-    Only includes columns that are actually present in *row* — Electric sends
-    partial payloads on update operations.
-    """
     result: dict[str, object] = {}
     for col in table.columns:
         if col.name not in row:
@@ -48,8 +41,6 @@ def _pk_col(table: sa.Table) -> sa.Column:
 
 
 class ElectricConsumerTask(AbstractTask):
-    """Subscribes to a single Electric shape and writes changes to the local DB."""
-
     def __init__(
         self,
         engine: AsyncEngine,
@@ -107,7 +98,7 @@ class ElectricConsumerTask(AbstractTask):
                 await conn.execute(
                     delete(electric_offset).where(electric_offset.c.shape_name == self.shape_name),
                 )
-            exit()
+            exit()  # need to run migrations
 
         response.raise_for_status()
 

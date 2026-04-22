@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import re
 
 from decancer_py import parse as decancer_parse

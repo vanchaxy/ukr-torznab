@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import datetime
 
@@ -18,10 +17,7 @@ class DownloadTopicsTask(AbstractTask):
             topic_and_download_ids = await get_topic_id_to_download(conn)
             if not topic_and_download_ids:
                 logger.info("No topics to download, sleeping")
-                for _ in range(60):
-                    if not self.running:
-                        return
-                    await asyncio.sleep(1)
+                await self.interruptible_sleep(60)
                 return
 
             topic_id, download_id = topic_and_download_ids

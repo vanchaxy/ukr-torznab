@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import re
 from collections import Counter
 from pathlib import Path
@@ -14,11 +12,6 @@ def match_episodes(
     skyhook: dict,
     season: int,
 ) -> tuple[dict[str, tuple[int, int]], bool] | None:
-    """Try to map each video file to a (season, episode) tuple for *season*.
-
-    Returns ``(file_to_episode, season_complete)`` or ``None`` when matching
-    fails.
-    """
     season_episodes = _get_season_episodes(skyhook, season)
     if not season_episodes:
         return None
@@ -51,7 +44,6 @@ async def match_episodes_llm(
     season: int,
     client: AsyncOpenAI,
 ) -> tuple[dict[str, tuple[int, int]], bool, int] | None:
-    """LLM fallback: ask GPT to map files to episodes when heuristics fail."""
     show_name = skyhook.get("title", "")
 
     expected_keys = [str(i) for i in range(len(video_files))]

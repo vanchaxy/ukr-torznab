@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -14,8 +12,6 @@ from ukr_torznab.db.upsert import upsert
 
 
 class ServarrClient:
-    """HTTP client for the Radarr Servarr API with built-in DB caching."""
-
     def __init__(self) -> None:
         self._client = httpx.AsyncClient(
             base_url="https://radarrapi.servarr.com/v1",
@@ -44,7 +40,6 @@ class ServarrClient:
         conn: AsyncConnection,
         imdb_id: int,
     ) -> dict | None:
-        """Return Radarr movie metadata for *imdb_id*, using the DB as a cache."""
         row = (
             await conn.execute(
                 select(servarr_table).where(servarr_table.c.imdbid == imdb_id),
@@ -81,5 +76,5 @@ class ServarrClient:
 
         return response_data
 
-    async def aclose(self) -> None:
+    async def close(self) -> None:
         await self._client.aclose()

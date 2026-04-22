@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 import sqlalchemy as sa
@@ -23,10 +22,7 @@ class RefreshTopicsTask(AbstractTask):
             ).scalar()
         if topic_count and topic_count >= 30_000:
             logger.info("RefreshTopicsTask: waiting before full category refresh")
-            for _ in range(10 * 60 * 60):
-                if not self.running:
-                    return
-                await asyncio.sleep(1)
+            await self.interruptible_sleep(10 * 60 * 60)
         else:
             logger.info(
                 "RefreshTopicsTask: only %d topics in DB, refreshing immediately",
@@ -78,7 +74,4 @@ class CheckNewTopicsTask(AbstractTask):
                         await upsert_topic(conn, topic_data=topic, category=category)
 
         logger.info("CheckNewTopicsTask: waiting")
-        for _ in range(10 * 60):
-            if not self.running:
-                return
-            await asyncio.sleep(1)
+        await self.interruptible_sleep(10 * 60)

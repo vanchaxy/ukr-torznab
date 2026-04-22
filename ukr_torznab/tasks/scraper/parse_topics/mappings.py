@@ -1,11 +1,4 @@
-"""Lookup tables used during HTML parsing.
-
-These map raw strings found in toloka.to pages to typed enum values.
-They live here (not in db/enums) because they are scraper-specific knowledge
-about how the tracker encodes information — not a property of the DB schema.
-"""
-
-from ukr_torznab.enums import (
+from ukr_torznab.models import (
     AudioSource,
     AudioType,
     CodecFamily,
@@ -185,7 +178,8 @@ AUDIO_SOURCE_TITLES_MAP = sorted(
         ("україна", AudioSource.UKRAINA),
         ("vhs record", AudioSource.VHS_RECORD),
     ],
-    key=lambda x: -len(x[0]),
+    key=lambda x: len(x[0]),
+    reverse=True,
 )
 
 AUDIO_SOURCE_MAP = sorted(
@@ -333,7 +327,8 @@ AUDIO_SOURCE_MAP = sorted(
         ("в одне рило", AudioSource.V_ODNE_RYLO),
         ("yaniam", AudioSource.YANIAM),
     ],
-    key=lambda x: -len(x[0]),
+    key=lambda x: len(x[0]),
+    reverse=True,
 )
 
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -14,8 +12,6 @@ from ukr_torznab.db.upsert import upsert
 
 
 class SkyhookClient:
-    """HTTP client for the Sonarr Skyhook API with built-in DB caching."""
-
     def __init__(self) -> None:
         self._client = httpx.AsyncClient(
             base_url="https://skyhook.sonarr.tv/v1/tvdb",
@@ -86,5 +82,5 @@ class SkyhookClient:
 
         return response_data
 
-    async def aclose(self) -> None:
+    async def close(self) -> None:
         await self._client.aclose()

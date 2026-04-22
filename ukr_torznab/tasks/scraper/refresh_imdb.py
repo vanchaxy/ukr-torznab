@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 import zlib
@@ -54,10 +53,7 @@ class RefreshImdbTask(AbstractTask):
                 "RefreshImdbTask: waiting %dh before next refresh",
                 REFRESH_INTERVAL // 3600,
             )
-            for _ in range(REFRESH_INTERVAL):
-                if not self.running:
-                    return
-                await asyncio.sleep(1)
+            await self.interruptible_sleep(REFRESH_INTERVAL)
         else:
             logger.info("RefreshImdbTask: imdb_titles is empty, refreshing immediately")
 

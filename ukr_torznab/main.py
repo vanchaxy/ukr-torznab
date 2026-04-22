@@ -67,8 +67,8 @@ async def main():
         from ukr_torznab.clients.utp import UtpClient
 
         utp_client = UtpClient(api_key=UTP_API_KEY)
-        api_app.state.utp_client = utp_client
         logging.getLogger(__name__).info("UTP client enabled")
+    api_app.state.utp_client = utp_client
 
     tasks: list[AbstractTask] = []
     electric_client: httpx.AsyncClient | None = None
@@ -162,9 +162,9 @@ async def main():
         await engine.dispose()
         await toloka_client.close()
         if skyhook_client is not None:
-            await skyhook_client.aclose()
+            await skyhook_client.close()
         if servarr_client is not None:
-            await servarr_client.aclose()
+            await servarr_client.close()
         if openai_client is not None:
             await openai_client.close()
         if electric_client is not None:

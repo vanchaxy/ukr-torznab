@@ -1,17 +1,6 @@
-"""Main processing pipeline.
-
-Reads every page from the database and yields either a fully-populated
-:class:`ParsedPage` or a :class:`SkippedPage` with the reason it was
-excluded.
-"""
-
-from __future__ import annotations
-
-import dataclasses
 import hashlib
 import html as html_mod
 import logging
-import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -28,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from ukr_torznab.clients.servarr import ServarrClient
 from ukr_torznab.clients.skyhook import SkyhookClient
 from ukr_torznab.db.tables import imdb_titles as imdb_titles_table
-from ukr_torznab.enums import AudioType, ContentType, Lang, SkipReason
+from ukr_torznab.models import AudioType, ContentType
 from ukr_torznab.tasks.scraper.parse_topics.episodes import match_episodes, match_episodes_llm
 from ukr_torznab.tasks.scraper.parse_topics.extras import (
     detect_cut,
@@ -36,112 +25,27 @@ from ukr_torznab.tasks.scraper.parse_topics.extras import (
     detect_hybrid,
     detect_ratio,
 )
-from ukr_torznab.tasks.scraper.parse_topics.imdb import extract_imdb_multi
+from ukr_torznab.tasks.scraper.parse_topics.hash import content_hash, hash_video_files
+from ukr_torznab.tasks.scraper.parse_topics.imdb import extract_imdb
 from ukr_torznab.tasks.scraper.parse_topics.metadata import (
     detect_audio_sources,
     detect_audio_types,
+    detect_author,
     detect_codec,
     detect_languages,
     detect_quality,
     detect_release_group,
     detect_resolution,
+    resolve_original_lang,
 )
-from ukr_torznab.tasks.scraper.parse_topics.models import ParsedPage, SkippedPage
+from ukr_torznab.tasks.scraper.parse_topics.models import ParsedPage, SkippedPage, SkipReason
 from ukr_torznab.tasks.scraper.parse_topics.season import detect_season
-from ukr_torznab.tasks.scraper.parse_topics.utils import ALLOWED_EXTENSIONS, VIDEO_EXTENSIONS
+from ukr_torznab.utils import ALLOWED_EXTENSIONS, VIDEO_EXTENSIONS
 
 logger = logging.getLogger(__name__)
-_h2t = html2text.HTML2Text(bodywidth=0)
-
-_AUTHOR_DISALLOWED = re.compile(r"[^a-zа-яёіїєґ0-9_-]+")
-
-# ISO 639-2/T (3-letter, used by Skyhook) → ISO 639-1 (2-letter, used by Lang)
-_ISO3_TO_LANG: dict[str, Lang] = {
-    "ukr": Lang.UKRAINIAN,
-    "eng": Lang.ENGLISH,
-    "spa": Lang.SPANISH,
-    "fra": Lang.FRENCH,
-    "fre": Lang.FRENCH,
-    "zho": Lang.CHINESE,
-    "chi": Lang.CHINESE,
-    "tha": Lang.THAI,
-    "jpn": Lang.JAPANESE,
-    "kor": Lang.KOREAN,
-    "deu": Lang.GERMAN,
-    "ger": Lang.GERMAN,
-    "nor": Lang.NORWEGIAN,
-    "ita": Lang.ITALIAN,
-    "fin": Lang.FINNISH,
-    "srp": Lang.SERBIAN,
-    "nld": Lang.DUTCH,
-    "dut": Lang.DUTCH,
-    "swe": Lang.SWEDISH,
-    "ron": Lang.ROMANIAN,
-    "rum": Lang.ROMANIAN,
-    "rus": Lang.RUSSIAN,
-    "ara": Lang.ARABIC,
-    "dan": Lang.DANISH,
-    "hrv": Lang.CROATIAN,
-    "pol": Lang.POLISH,
-    "por": Lang.PORTUGUESE,
-    "ces": Lang.CZECH,
-    "cze": Lang.CZECH,
-    "hin": Lang.HINDI,
-    "est": Lang.ESTONIAN,
-    "bul": Lang.BULGARIAN,
-    "ell": Lang.GREEK,
-    "gre": Lang.GREEK,
-    "hun": Lang.HUNGARIAN,
-    "mol": Lang.MOLDOVAN,
-    "slv": Lang.SLOVENIAN,
-    "tur": Lang.TURKISH,
-    "fas": Lang.PERSIAN,
-    "per": Lang.PERSIAN,
-    "isl": Lang.ICELANDIC,
-    "ice": Lang.ICELANDIC,
-    "slk": Lang.SLOVAK,
-    "slo": Lang.SLOVAK,
-    "ind": Lang.INDONESIAN,
-    "afr": Lang.AFRIKAANS,
-}
 
 
-def _resolve_original_lang(code: str | None) -> Lang | None:
-    if not code:
-        return None
-    code = code.lower()
-    if len(code) == 3:
-        return _ISO3_TO_LANG.get(code)
-    try:
-        return Lang(code)
-    except ValueError:
-        return None
-
-
-def _hash_video_files(files: list[Path]) -> str:
-    h = hashlib.sha256()
-    for p in sorted(str(f) for f in files):
-        h.update(p.encode())
-    return h.hexdigest()
-
-
-def _normalise(val: object) -> str:
-    if isinstance(val, (set, frozenset)):
-        return repr(sorted(_normalise(v) for v in val))
-    if isinstance(val, list):
-        return repr(sorted(_normalise(v) for v in val))
-    if isinstance(val, dict):
-        return repr(sorted((_normalise(k), _normalise(v)) for k, v in val.items()))
-    return repr(val)
-
-
-def _content_hash(page: ParsedPage) -> str:
-    h = hashlib.sha256()
-    for f in dataclasses.fields(page):
-        if f.name == "content_hash":
-            continue
-        h.update(_normalise(getattr(page, f.name)).encode())
-    return h.hexdigest()
+H2T = html2text.HTML2Text(bodywidth=0)
 
 
 async def process_single_page(
@@ -210,7 +114,7 @@ async def process_single_page(
 
     # 4. IMDB extraction
     single_file = len(video_files) == 1
-    imdb_raw = extract_imdb_multi(dom, single_file=single_file)
+    imdb_raw = extract_imdb(dom, single_file=single_file)
     if imdb_raw is None:
         return SkippedPage(pid, SkipReason.NO_IMDB_LINK)
     imdb: int = int(imdb_raw[2:])
@@ -262,6 +166,10 @@ async def process_single_page(
         if season is None:
             return SkippedPage(pid, SkipReason.CANNOT_DETERMINE_SEASON)
 
+    dom_str = tostring(dom).decode("utf-8")
+    html_lower = html_mod.unescape(dom_str).lower()
+    text = "\n".join(filter(str.strip, H2T.handle(html_lower).splitlines()))
+
     # Prefer external metadata title/year over IMDB
     effective_title = imdb_title
     effective_year = start_year
@@ -274,17 +182,12 @@ async def process_single_page(
         effective_title = servarr.get("Title") or imdb_title
         effective_year = servarr.get("Year") or start_year
 
-    # --- Passed all filters – build the full record -------------------------
-    dom_str = tostring(dom).decode("utf-8")
-    html_lower = html_mod.unescape(dom_str).lower()
-    text = "\n".join(filter(str.strip, _h2t.handle(html_lower).splitlines()))
-
     # Episode matching
     file_to_episode = None
     season_complete = None
     video_files_hash = None
     if content_type is ContentType.TV and skyhook and season is not None:
-        current_hash = _hash_video_files(video_files)
+        current_hash = hash_video_files(video_files)
         if cached_video_files_hash == current_hash:
             file_to_episode = cached_file_to_episode
             season_complete = cached_season_complete
@@ -312,11 +215,8 @@ async def process_single_page(
         if episodes:
             last_episode = max(episodes)
 
-    # Author
-    author_raw = str(cast("list", dom.xpath('//span[@class="name"]//text()'))[0]).lower()
-    author: str | None = _AUTHOR_DISALLOWED.sub("", author_raw) or None
-
-    # Release group
+    # Author and release group
+    author = detect_author(dom)
     release_group = detect_release_group(ti.name().lower())
 
     # Media metadata
@@ -330,7 +230,7 @@ async def process_single_page(
             if servarr
             else None
         )
-        original_lang = _resolve_original_lang(original_code)
+        original_lang = resolve_original_lang(original_code)
         if original_lang is not None:
             audio_lang = audio_lang | {original_lang}
 
@@ -366,5 +266,5 @@ async def process_single_page(
         ratio=detect_ratio(name),
         hybrid=detect_hybrid(name),
     )
-    page.content_hash = _content_hash(page)
+    page.content_hash = content_hash(page)
     return page
