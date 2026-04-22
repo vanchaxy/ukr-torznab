@@ -145,9 +145,9 @@ class RenameTorrentsTask(AbstractTask):
 
     async def _finalize(self, qbt_hash: str) -> None:
         await self.qbt_client.add_tags(qbt_hash, [QBITTORRENT_RENAME_TAG])
-        # await self.qbt_client.recheck(qbt_hash)
-        # await self.qbt_client.stop(qbt_hash)
-        # await self.qbt_client.start(qbt_hash)
+        await self.qbt_client.recheck(qbt_hash)
+        await self.qbt_client.stop(qbt_hash)
+        await self.qbt_client.start(qbt_hash)
 
     async def _apply_renames(
         self,
