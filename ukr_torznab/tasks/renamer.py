@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import logging
 import os
@@ -171,7 +172,32 @@ class RenameTorrentsTask(AbstractTask):
             return
 
         if old_folder:
-            await self.qbt_client.rename_folder(qbt_hash, old_folder, _target_folder(release))
+            await self._rename_folder(qbt_hash, old_folder, _target_folder(release))
+
+    async def _rename_file(self, qbt_hash: str, old_path: str, new_path: str) -> None:
+        await self.qbt_client.rename_file(qbt_hash, old_path, new_path)
+        await self._wait_for_file_rename(qbt_hash, new_path)
+
+    async def _rename_folder(self, qbt_hash: str, old_path: str, new_path: str) -> None:
+        await self.qbt_client.rename_folder(qbt_hash, old_path, new_path)
+        await self._wait_for_folder_rename(qbt_hash, old_path)
+
+    async def _wait_for_file_rename(self, qbt_hash: str, new_path: str) -> None:
+        for _ in range(60):
+            files = await self.qbt_client.get_torrent_files(qbt_hash)
+            if any(f.get("name") == new_path for f in files):
+                return
+            await asyncio.sleep(1)
+        raise TimeoutError(f"rename did not complete in 60 s: expected {new_path!r}")
+
+    async def _wait_for_folder_rename(self, qbt_hash: str, old_folder: str) -> None:
+        prefix = old_folder + "/"
+        for _ in range(60):
+            files = await self.qbt_client.get_torrent_files(qbt_hash)
+            if not any(f.get("name", "").startswith(prefix) for f in files):
+                return
+            await asyncio.sleep(1)
+        raise TimeoutError(f"folder rename did not complete in 60 s: still has files under {old_folder!r}")
 
     async def _rename_bare_file(
         self,
@@ -182,7 +208,7 @@ class RenameTorrentsTask(AbstractTask):
         old = entry.get("name", "")
         new = _target_filename(release, old, os.path.splitext(old)[1])
         if old != new:
-            await self.qbt_client.rename_file(qbt_hash, old, new)
+            await self._rename_file(qbt_hash, old, new)
 
     async def _rename_solo_video(
         self,
@@ -197,7 +223,7 @@ class RenameTorrentsTask(AbstractTask):
         new_basename = _target_filename(release, old_path, ext)
 
         if not old_folder:
-            await self.qbt_client.rename_file(qbt_hash, old_path, new_basename)
+            await self._rename_file(qbt_hash, old_path, new_basename)
             return
 
         if old_basename != new_basename:
@@ -240,7 +266,7 @@ class RenameTorrentsTask(AbstractTask):
                     new_basename,
                 )
             else:
-                await self.qbt_client.rename_file(qbt_hash, old_path, new_basename)
+                await self._rename_file(qbt_hash, old_path, new_basename)
             logger.debug("  file: %r → %r", old_basename, new_basename)
 
         if old_folder:
@@ -253,7 +279,7 @@ class RenameTorrentsTask(AbstractTask):
         old_basename: str,
         new_basename: str,
     ) -> None:
-        await self.qbt_client.rename_file(
+        await self._rename_file(
             qbt_hash,
             f"{folder}/{old_basename}",
             f"{folder}/{new_basename}",
@@ -266,4 +292,4 @@ class RenameTorrentsTask(AbstractTask):
         new: str,
     ) -> None:
         if old != new:
-            await self.qbt_client.rename_folder(qbt_hash, old, new)
+            await self._rename_folder(qbt_hash, old, new)

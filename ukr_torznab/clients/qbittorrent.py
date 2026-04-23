@@ -11,7 +11,7 @@ class QBittorrentClient:
             base_url=f"{url.rstrip('/')}/api/v2",
             timeout=30,
             transport=AsyncRateLimitedTransport.create(
-                AiolimiterAsyncLimiter.create(Rate.create(1, 1)),
+                AiolimiterAsyncLimiter.create(Rate.create(4, 1)),
             ),
         )
 

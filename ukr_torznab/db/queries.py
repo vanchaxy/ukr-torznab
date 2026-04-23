@@ -11,7 +11,7 @@ from ukr_torznab.db.tables import page, release, topic
 from ukr_torznab.db.upsert import upsert
 from ukr_torznab.models import Release
 
-PARSER_VERSION = 8
+PARSER_VERSION = 9
 
 
 def _topic_hash(name, size, download_id, added_on, updated_at) -> str:
