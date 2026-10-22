@@ -72,6 +72,8 @@ A FastAPI app on port `8000` with one Torznab endpoint per tracker.
 - `GET /toloka/api?t=movie&imdbid=tt1234567`: movie search (`tmdbid` also accepted)
 - `GET /toloka/download/{download_id}`: proxies the `.torrent` file from toloka.to with the scraper's session
 - `GET /utp/api?...`: the same Torznab interface, backed by the utp.to API (requires `UTP_API_KEY`)
+- `GET /toloka/info/{topic_id}`: JSON parser state for one topic (`ok`, `skipped` with reason, `pending`, `not_downloaded`, `not_indexed`) and the parsed release
+- `GET /utp/info/{torrent_id}`: JSON parsed view of one UTP torrent, with per-audio-track detection and warnings (cached for 15 minutes)
 
 All search functions accept `cat`, `offset`, `limit` (max 100) and `xseed=1`. With `xseed=1` the release group suffix is dropped from titles, which helps cross-seed matching.
 
@@ -114,6 +116,15 @@ Renames torrents downloaded by qBittorrent to the same scene-style names, then r
 Running the scraper needs toloka.to credentials and the IMDB dataset, and optionally OpenAI. Instead, one instance can run the scraper on PostgreSQL and publish the `topic` and `release` tables through [ElectricSQL](https://electric-sql.com/). Other instances set `ELECTRIC_URL` and replace the scraper tasks with `ElectricConsumerTask`, which streams those tables into their local database. Toloka credentials are still required so `/toloka/download` can fetch `.torrent` files.
 
 On the publishing side, set `CREATE_ELECTRIC_PUBLICATION=1` and `ELECTRIC_USER_PASSWORD` before the first migration. This creates the `electric_user` role and the publication.
+
+### 5. Browser extension (optional)
+
+`browser-extension/` is a Chrome (MV3) extension that shows the parser's view on the tracker pages, using the `/info` endpoints:
+
+- toloka.to topic lists (`tracker.php`, `/fNN`) and utp.to/torrents: one line under each title with the release name, or why the topic was skipped or isn't indexed yet
+- toloka.to topics and utp.to torrent pages: a panel with the release, cross-seed and folder names, ids, every detected attribute, the file → episode map and renamed files (TV), and the per-track audio detection (UTP)
+
+Load it via `chrome://extensions` → Developer mode → **Load unpacked**. Set the indexer URL in the extension popup (default `http://localhost:8000`). See `browser-extension/README.md`.
 
 ---
 
@@ -213,6 +224,7 @@ ukr_torznab/
     renamer.py       qBittorrent renamer
     consumer.py      ElectricSQL consumer
 migrations/          Alembic migrations (hand-written)
+browser-extension/   Chrome extension showing parser output on toloka.to / utp.to
 ```
 
 ---

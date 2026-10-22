@@ -13,6 +13,13 @@ from ukr_torznab.models import Release
 
 PARSER_VERSION = 10
 
+# Torznab search only returns topics seen on the tracker this recently.
+SEARCH_WINDOW = timedelta(days=2)
+
+
+def _observed_recently():
+    return topic.c.observed_at > datetime.now().astimezone() - SEARCH_WINDOW
+
 
 def _topic_hash(name, size, download_id, added_on, updated_at) -> str:
     h = hashlib.sha256()
@@ -225,7 +232,7 @@ async def search_releases(
         select(*_RELEASE_COLUMNS)
         .join(release, topic.c.id == release.c.id)
         .where(release.c.result == "ok")
-        .where(topic.c.observed_at > datetime.now().astimezone() - timedelta(days=2))
+        .where(_observed_recently())
     )
     if q:
         q_lower = q.lower()
@@ -269,6 +276,36 @@ async def search_releases(
         )
     query = query.order_by(release.c.registered_at.desc()).offset(offset).limit(limit)
     return [Release.from_db_row(row) for row in (await conn.execute(query)).fetchall()]
+
+
+async def get_topic_info(conn: AsyncConnection, topic_id: int):
+    """One topic with its page status and release row (all outer-joined), or None."""
+    query = (
+        select(
+            *_RELEASE_COLUMNS,
+            topic.c.category,
+            topic.c.added_on,
+            topic.c.updated_at,
+            topic.c.observed_at,
+            # Same condition search_releases filters on, so the extension agrees with Sonarr.
+            _observed_recently().label("searchable"),
+            page.c.downloaded_at,
+            page.c.html.is_not(None).label("has_html"),
+            page.c.torrent.is_not(None).label("has_torrent"),
+            release.c.id.label("release_id"),
+            release.c.result,
+            release.c.parsed_at,
+            release.c.parser_version,
+            release.c.hash_changed_at,
+            release.c.video_files,
+            release.c.last_episode,
+            release.c.acodec,
+        )
+        .outerjoin(page, topic.c.id == page.c.id)
+        .outerjoin(release, topic.c.id == release.c.id)
+        .where(topic.c.id == topic_id)
+    )
+    return (await conn.execute(query)).first()
 
 
 async def get_releases_by_infohash(

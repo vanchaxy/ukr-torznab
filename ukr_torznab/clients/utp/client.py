@@ -103,10 +103,15 @@ class UtpClient:
             return []
 
     async def get_by_id(self, torrent_id: str) -> Release | None:
+        item = await self.get_item(torrent_id)
+        return transform_utp_item(item) if item is not None else None
+
+    async def get_item(self, torrent_id: str) -> dict | None:
+        """The raw API item, for callers that need more than the parsed `Release`."""
         try:
             resp = await self._client.get(f"/{torrent_id}", params={"api_token": self._api_key})
             resp.raise_for_status()
-            return transform_utp_item(resp.json())
+            return resp.json()
         except httpx.HTTPError:
             logger.exception("UTP get_by_id failed for id=%s", torrent_id)
             return None

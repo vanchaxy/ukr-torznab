@@ -5,9 +5,10 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ukr_torznab.api.caps import caps_response
+from ukr_torznab.api.info import toloka_topic_info
 from ukr_torznab.api.search import SEARCH_FUNCTIONS, SearchParams, build_rss, search_params
 from ukr_torznab.api.xml import error_xml
-from ukr_torznab.db.queries import search_releases
+from ukr_torznab.db.queries import get_topic_info, search_releases
 
 router = APIRouter(prefix="/toloka")
 
@@ -54,3 +55,12 @@ async def download_torrent(request: Request, download_id: int) -> Response:
         media_type="application/x-bittorrent",
         headers={"Content-Disposition": f'attachment; filename="{download_id}.torrent"'},
     )
+
+
+@router.get("/info/{topic_id}")
+async def topic_info(request: Request, topic_id: int) -> dict:
+    """Parser result for one topic, for the browser extension."""
+    engine: AsyncEngine = request.app.state.engine
+    async with engine.connect() as conn:
+        row = await get_topic_info(conn, topic_id)
+    return toloka_topic_info(topic_id, row)
