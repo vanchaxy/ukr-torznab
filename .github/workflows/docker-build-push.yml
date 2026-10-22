@@ -1,0 +1,69 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read package version
+        id: version
+        run: |
+          VERSION=$(grep -Po '__version__\s*=\s*"\K[^"]+' ukr_torznab/__init__.py)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version against branch
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="${{ github.ref_name }}"
+          if [[ "$VERSION" =~ rc ]]; then
+            if [[ "$BRANCH" == "main" ]]; then
+              echo "::error::rc version '$VERSION' is not allowed on main"
+              exit 1
+            fi
+          else
+            if [[ "$BRANCH" != "main" ]]; then
+              echo "::error::non-rc version '$VERSION' is only allowed on main (branch: $BRANCH)"
+              exit 1
+            fi
+          fi
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
