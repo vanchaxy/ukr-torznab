@@ -1,0 +1,156 @@
+.ukr-tz-badge,
+.ukr-tz-panel {
+  --tz-fg: #1d2433;
+  --tz-muted: #5b6475;
+  --tz-bg: #f6f8fb;
+  --tz-border: #d5dbe5;
+  --tz-ok: #067647;
+  --tz-ok-bg: #dcfae6;
+  --tz-warn: #93370d;
+  --tz-warn-bg: #fef0c7;
+  --tz-bad: #b42318;
+  --tz-bad-bg: #fee4e2;
+  --tz-chip-muted-bg: #eaecf0;
+  --tz-code-bg: #ffffff;
+  font: 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--tz-fg);
+  text-align: left;
+}
+
+.ukr-tz-dark {
+  --tz-fg: #d6dae2;
+  --tz-muted: #98a2b3;
+  --tz-bg: #2b2f36;
+  --tz-border: #444b57;
+  --tz-ok: #75e0a7;
+  --tz-ok-bg: #0b3d26;
+  --tz-warn: #fec84b;
+  --tz-warn-bg: #4e3810;
+  --tz-bad: #fda29b;
+  --tz-bad-bg: #55160c;
+  --tz-chip-muted-bg: #3a404a;
+  --tz-code-bg: #1f2227;
+}
+
+.ukr-tz-badge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  max-width: 100%;
+}
+
+.ukr-tz-logo {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--tz-fg);
+  color: var(--tz-bg);
+}
+
+.ukr-tz-name {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60ch;
+}
+
+.ukr-tz-ok-text { color: var(--tz-ok); }
+
+.ukr-tz-chip {
+  display: inline-block;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 9px;
+  white-space: nowrap;
+  cursor: default;
+}
+.ukr-tz-ok { background: var(--tz-ok-bg); color: var(--tz-ok); }
+.ukr-tz-warn { background: var(--tz-warn-bg); color: var(--tz-warn); }
+.ukr-tz-bad { background: var(--tz-bad-bg); color: var(--tz-bad); }
+.ukr-tz-muted { background: var(--tz-chip-muted-bg); color: var(--tz-muted); }
+
+.ukr-tz-copy {
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 4px;
+  border: 1px solid var(--tz-border);
+  border-radius: 3px;
+  background: var(--tz-code-bg);
+  color: var(--tz-muted);
+  cursor: pointer;
+}
+.ukr-tz-copy:hover { color: var(--tz-fg); }
+
+.ukr-tz-panel {
+  display: block;
+  margin: 10px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--tz-border);
+  border-radius: 6px;
+  background: var(--tz-bg);
+  font-size: 13px;
+}
+div.ukr-tz-panel { display: flex; gap: 6px; align-items: center; }
+
+.ukr-tz-panel > summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.ukr-tz-body { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.ukr-tz-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ukr-tz-explain { margin: 0; color: var(--tz-fg); }
+.ukr-tz-meta { color: var(--tz-muted); font-size: 11px; }
+
+.ukr-tz-namerow { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.ukr-tz-label { flex: 0 0 72px; color: var(--tz-muted); }
+.ukr-tz-namerow code {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  padding: 1px 4px;
+  background: var(--tz-code-bg);
+  border: 1px solid var(--tz-border);
+  border-radius: 3px;
+  overflow-wrap: anywhere;
+  color: var(--tz-fg);
+}
+
+.ukr-tz-panel table { border-collapse: collapse; font-size: 12px; color: var(--tz-fg); }
+.ukr-tz-panel a { color: inherit; text-decoration: underline; }
+.ukr-tz-kv th {
+  text-align: left;
+  font-weight: normal;
+  color: var(--tz-muted);
+  padding: 1px 12px 1px 0;
+  vertical-align: top;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+}
+.ukr-tz-kv td { padding: 1px 0; background: none; border: 0; }
+
+.ukr-tz-sub > summary { cursor: pointer; color: var(--tz-muted); }
+.ukr-tz-grid { margin-top: 4px; width: 100%; }
+.ukr-tz-grid th,
+.ukr-tz-grid td {
+  text-align: left;
+  padding: 2px 8px 2px 0;
+  border: 0;
+  border-bottom: 1px solid var(--tz-border);
+  background: none;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.ukr-tz-grid th { color: var(--tz-muted); font-weight: normal; }
+.ukr-tz-files { margin: 4px 0 0; padding-left: 18px; font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
+.ukr-tz-panel table.ukr-tz-kv { width: auto; }
+.ukr-tz-panel .ukr-tz-kv th { width: 1%; }

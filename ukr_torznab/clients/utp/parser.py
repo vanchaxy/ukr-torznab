@@ -316,6 +316,30 @@ def parse_audio_tracks(
     )
 
 
+def parse_track_details(
+    mediainfo: dict[str, list[dict[str, str]]],
+) -> list[dict[str, str | None]]:
+    """Per audio track: what `parse_audio_tracks` detected from it. Display only."""
+    tracks: list[dict[str, str | None]] = []
+    for track in mediainfo.get("Audio", []):
+        lang = _parse_lang(track.get("Language", ""))
+        title = track.get("Title", "")
+        studio = _detect_studio(title)
+        audio_type = _detect_audio_type(title, lang)
+        tracks.append(
+            {
+                "title": title,
+                "language": track.get("Language"),
+                "format": track.get("Format"),
+                "channels": track.get("Channel(s)"),
+                "lang": str(lang) or lang.value,
+                "type": str(audio_type) or audio_type.value,
+                "studio": str(studio) if studio is not None else None,
+            },
+        )
+    return tracks
+
+
 def parse_subtitle_langs(
     mediainfo: dict[str, list[dict[str, str]]],
 ) -> list[Lang]:

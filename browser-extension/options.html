@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Ukr Torznab Inspector</title>
+  <style>
+    body { font: 14px system-ui, sans-serif; margin: 16px; min-width: 340px; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; }
+    input { width: 100%; box-sizing: border-box; padding: 6px; font: inherit; }
+    .row { display: flex; gap: 8px; margin-top: 10px; }
+    #status { margin-top: 10px; min-height: 1.2em; color: #555; }
+    #status.err { color: #b42318; }
+    #status.ok { color: #067647; }
+  </style>
+</head>
+<body>
+  <label for="baseUrl">Indexer URL</label>
+  <input id="baseUrl" type="url" placeholder="http://localhost:8000">
+  <div class="row">
+    <button id="save">Save</button>
+    <button id="test">Test connection</button>
+    <button id="clear">Clear cache</button>
+  </div>
+  <div id="status"></div>
+  <script src="options.js"></script>
+</body>
+</html>

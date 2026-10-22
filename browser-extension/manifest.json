@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Ukr Torznab Inspector",
+  "version": "0.1.0",
+  "description": "Shows how the toloka-torznab indexer parsed toloka.to and utp.to releases, or why it skipped them.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "options_ui": { "page": "options.html", "open_in_tab": false },
+  "action": { "default_title": "Ukr Torznab Inspector", "default_popup": "options.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://toloka.to/*"],
+      "js": ["common.js", "toloka.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://utp.to/torrents*"],
+      "js": ["common.js", "utp.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
