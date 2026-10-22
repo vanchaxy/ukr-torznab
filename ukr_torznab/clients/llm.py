@@ -27,12 +27,11 @@ async def map_files_to_episodes(
         f"Files:\n{files_block}"
     )
 
-    model = "gpt-5-nano"
-    if episodes_block.count("\n") > 100:
-        model = "gpt-5.4-mini"
+    model = "gpt-6-luna"
 
     response = await client.chat.completions.create(
         model=model,
+        reasoning_effort="low",
         messages=[
             {
                 "role": "system",
