@@ -11,7 +11,7 @@ from ukr_torznab.db.tables import page, release, topic
 from ukr_torznab.db.upsert import upsert
 from ukr_torznab.models import Release
 
-PARSER_VERSION = 9
+PARSER_VERSION = 10
 
 
 def _topic_hash(name, size, download_id, added_on, updated_at) -> str:
@@ -237,12 +237,18 @@ async def search_releases(
         )
     if content_types:
         query = query.where(release.c.content_type.in_(content_types))
-    if imdb_id is not None:
-        query = query.where(release.c.imdb_id == imdb_id)
-    if tvdb_id is not None:
-        query = query.where(release.c.tvdb_id == tvdb_id)
-    if tmdb_id is not None:
-        query = query.where(release.c.tmdb_id == tmdb_id)
+    # Sonarr sends several ids for the same title at once; any of them may match.
+    id_matches = [
+        column == value
+        for column, value in (
+            (release.c.imdb_id, imdb_id),
+            (release.c.tvdb_id, tvdb_id),
+            (release.c.tmdb_id, tmdb_id),
+        )
+        if value is not None
+    ]
+    if id_matches:
+        query = query.where(or_(*id_matches))
     if episode is not None:
         query = query.where(
             release.c.file_to_episode.is_not(None),

@@ -33,20 +33,21 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Validate version against branch
+        id: validate
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           BRANCH="${{ github.ref_name }}"
+          PUSH=true
           if [[ "$VERSION" =~ rc ]]; then
             if [[ "$BRANCH" == "main" ]]; then
               echo "::error::rc version '$VERSION' is not allowed on main"
               exit 1
             fi
-          else
-            if [[ "$BRANCH" != "main" ]]; then
-              echo "::error::non-rc version '$VERSION' is only allowed on main (branch: $BRANCH)"
-              exit 1
-            fi
+          elif [[ "$BRANCH" != "main" ]]; then
+            echo "::notice::non-rc version '$VERSION' on branch '$BRANCH': building without pushing"
+            PUSH=false
           fi
+          echo "push=$PUSH" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -62,7 +63,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
+          push: ${{ steps.validate.outputs.push == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

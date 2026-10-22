@@ -55,7 +55,8 @@ for any script that imports the package.
 - Adding a new `AudioSource` also requires an entry in `AUDIO_SOURCE_DISPLAY`. `__str__` raises `KeyError` otherwise.
 - Times are stored timezone-aware. Toloka shows Kyiv local time, so use `utils.KYIV_TZ`. `utils.EPOCH` is the
   "unknown date" placeholder.
-- Version lives in `ukr_torznab/__init__.py`: an `rcN` suffix on branches, none on `main`. CI enforces this.
+- Version lives in `ukr_torznab/__init__.py`: no `rc` suffix on `main` (CI fails otherwise). Branches push images
+  only with an `rcN` suffix; without one CI builds but skips the push.
 
 ## Verifying changes
 

@@ -259,17 +259,23 @@ def _parse_lang(raw: str) -> Lang:
     return Lang.UNKNOWN
 
 
-def _detect_audio_type(title: str) -> AudioType:
+# Whole words only, so studio names like "CloverDUB" or "UFDUB" don't read as DUB.
+_AUDIO_TYPE_RES: list[tuple[re.Pattern[str], AudioType]] = [
+    (re.compile(r"\b(?:dub|дубляж)"), AudioType.DUB),
+    (re.compile(r"\bmvo\b|багатоголосий"), AudioType.MVO),
+    (re.compile(r"\bdvo\b|двоголосий"), AudioType.DVO),
+    (re.compile(r"\b(?:svo|vo)\b|одноголосий"), AudioType.SVO),
+    (re.compile(r"original|оригінал|\beng\b"), AudioType.ORIGINAL),
+]
+
+
+def _detect_audio_type(title: str, lang: Lang) -> AudioType:
     t = title.lower()
-    if "dub" in t or "дубляж" in t:
-        return AudioType.DUB
-    if "mvo" in t or "багатоголосий" in t:
-        return AudioType.MVO
-    if "dvo" in t:
-        return AudioType.DVO
-    if "svo" in t:
-        return AudioType.SVO
-    if "original" in t or "оригінал" in t or "eng" in t:
+    for pattern, audio_type in _AUDIO_TYPE_RES:
+        if pattern.search(t):
+            return audio_type
+    # Untagged foreign-language tracks on a Ukrainian tracker are the original audio.
+    if lang not in (Lang.UKRAINIAN, Lang.UNKNOWN):
         return AudioType.ORIGINAL
     return AudioType.UNKNOWN
 
@@ -297,7 +303,7 @@ def parse_audio_tracks(
         audio_langs.add(lang)
 
         title = track.get("Title", "")
-        audio_types.add(_detect_audio_type(title))
+        audio_types.add(_detect_audio_type(title, lang))
 
         studio = _detect_studio(title)
         if studio is not None:
