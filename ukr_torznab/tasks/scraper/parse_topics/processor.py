@@ -4,7 +4,6 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
-from zoneinfo import ZoneInfo
 
 import html2text
 import libtorrent as lt  # type: ignore[import-untyped]
@@ -40,7 +39,7 @@ from ukr_torznab.tasks.scraper.parse_topics.metadata import (
 )
 from ukr_torznab.tasks.scraper.parse_topics.models import ParsedPage, SkippedPage, SkipReason
 from ukr_torznab.tasks.scraper.parse_topics.season import detect_season
-from ukr_torznab.utils import ALLOWED_EXTENSIONS, VIDEO_EXTENSIONS
+from ukr_torznab.utils import ALLOWED_EXTENSIONS, EPOCH, KYIV_TZ, VIDEO_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +74,10 @@ async def process_single_page(
         .strip()
     )
     if raw_reg:
-        kyiv_dt = datetime.strptime(raw_reg, "%Y-%m-%d %H:%M").replace(
-            tzinfo=ZoneInfo("Europe/Kyiv"),
-        )
+        kyiv_dt = datetime.strptime(raw_reg, "%Y-%m-%d %H:%M").replace(tzinfo=KYIV_TZ)
         registered_at = kyiv_dt.astimezone(UTC)
     else:
-        registered_at = datetime(1970, 1, 1, tzinfo=UTC)
+        registered_at = EPOCH
 
     dom_list = cast(
         "list[_Element]",

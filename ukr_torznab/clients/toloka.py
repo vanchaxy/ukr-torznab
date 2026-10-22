@@ -2,20 +2,18 @@ import logging
 import re
 from datetime import datetime
 from typing import Any, cast
-from zoneinfo import ZoneInfo
 
-import httpx
-from httpx_limiter import AsyncRateLimitedTransport, Rate
-from httpx_limiter.aiolimiter import AiolimiterAsyncLimiter
+from httpx_limiter import Rate
 from lxml import etree
 from lxml.etree import _Element
 
+from ukr_torznab.clients._http import BROWSER_HEADERS, make_client
 from ukr_torznab.settings import TOLOKA_CATEGORIES
+from ukr_torznab.utils import KYIV_TZ
 
 logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 90
-KYIV_TZ = ZoneInfo("Europe/Kyiv")
 
 
 def _xp(el: _Element, expr: str) -> list[Any]:
@@ -23,21 +21,14 @@ def _xp(el: _Element, expr: str) -> list[Any]:
 
 
 class TolokaClient:
-    def __init__(self, username, password):
+    def __init__(self, username: str, password: str):
         self._username = username
         self._password = password
-        self._client = httpx.AsyncClient(
-            base_url="https://toloka.to",
+        self._client = make_client(
+            "https://toloka.to",
+            rate=Rate.create(1, 2),
             follow_redirects=True,
-            headers={
-                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                "accept-language": "en-US,en;q=0.9,uk;q=0.8,ru;q=0.7,cs;q=0.6",
-                "cache-control": "max-age=0",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
-            },
-            transport=AsyncRateLimitedTransport.create(
-                AiolimiterAsyncLimiter.create(Rate.create(1, 2)),
-            ),
+            headers=BROWSER_HEADERS,
         )
 
     async def login(self):

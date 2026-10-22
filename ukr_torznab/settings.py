@@ -11,6 +11,8 @@ ELECTRIC_URL: str | None = os.environ.get("ELECTRIC_URL")
 
 API_PORT: int = int(os.environ.get("API_PORT", "8000"))
 
+LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO").upper()
+
 QBITTORRENT_URL: str | None = os.environ.get("QBITTORRENT_URL")
 QBITTORRENT_USERNAME: str = os.environ.get("QBITTORRENT_USERNAME", "admin")
 QBITTORRENT_PASSWORD: str = os.environ.get("QBITTORRENT_PASSWORD", "adminadmin")

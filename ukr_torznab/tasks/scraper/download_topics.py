@@ -1,6 +1,9 @@
 import logging
 from datetime import datetime
 
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from ukr_torznab.clients.toloka import TolokaClient
 from ukr_torznab.db.queries import get_topic_id_to_download, upsert_page
 from ukr_torznab.tasks.base import AbstractTask
 
@@ -8,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class DownloadTopicsTask(AbstractTask):
-    def __init__(self, client, engine):
+    def __init__(self, client: TolokaClient, engine: AsyncEngine):
         self.client = client
         self.engine = engine
 

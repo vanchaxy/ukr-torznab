@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 
-from ukr_torznab.api.caps import DEFAULT_LIMIT, MAX_LIMIT, caps_response
-from ukr_torznab.api.search import build_rss, content_type_filter, parse_imdbid
+from ukr_torznab.api.caps import caps_response
+from ukr_torznab.api.search import SEARCH_FUNCTIONS, SearchParams, build_rss, search_params
 from ukr_torznab.api.xml import error_xml
 from ukr_torznab.clients.utp import UtpClient
 
 router = APIRouter(prefix="/utp")
+
+TITLE = "UTP Torznab"
 
 UTP_CAT_MOVIE = 1
 UTP_CAT_TV = 2
@@ -15,61 +19,36 @@ UTP_CAT_TV = 2
 @router.get("/api")
 async def utp_torznab_api(
     request: Request,
-    t: str = "search",
-    q: str | None = None,
-    cat: str | None = None,
-    imdbid: str | None = None,
-    tvdbid: str | None = None,
-    tmdbid: str | None = None,
-    season: int | None = None,
-    ep: int | None = None,
-    offset: int = 0,
-    limit: int = DEFAULT_LIMIT,
-    xseed: int = 0,
+    params: Annotated[SearchParams, Depends(search_params)],
 ) -> Response:
-    if t == "caps":
-        return caps_response("UTP Torznab")
+    if params.t == "caps":
+        return caps_response(TITLE)
 
-    if t not in ("search", "tvsearch", "movie"):
+    if params.t not in SEARCH_FUNCTIONS:
         return error_xml(202, "No such function")
 
     utp_client: UtpClient | None = request.app.state.utp_client
     if utp_client is None:
         return error_xml(900, "UTP client not configured (set UTP_API_KEY)")
 
-    limit = min(max(limit, 1), MAX_LIMIT)
-    offset = max(offset, 0)
-
-    content_types = content_type_filter(
-        cat,
-        force_tv=(t == "tvsearch"),
-        force_movie=(t == "movie"),
-    )
-
     categories: list[int] | None = None
-    if content_types:
+    if params.content_types:
         categories = []
-        if "tv" in content_types:
+        if "tv" in params.content_types:
             categories.append(UTP_CAT_TV)
-        if "movie" in content_types:
+        if "movie" in params.content_types:
             categories.append(UTP_CAT_MOVIE)
 
-    parsed_imdbid = parse_imdbid(imdbid)
-    parsed_tvdbid = int(tvdbid) if tvdbid and tvdbid.isdigit() else None
-    parsed_tmdbid = int(tmdbid) if tmdbid and tmdbid.isdigit() else None
-
-    page = (offset // limit) + 1
-
     items = await utp_client.search(
-        name=q,
-        imdb_id=parsed_imdbid,
-        tvdb_id=parsed_tvdbid,
-        tmdb_id=parsed_tmdbid,
+        name=params.q,
+        imdb_id=params.imdb_id,
+        tvdb_id=params.tvdb_id,
+        tmdb_id=params.tmdb_id,
         categories=categories,
-        season=season,
-        episode=ep,
-        per_page=limit,
-        page=page,
+        season=params.season,
+        episode=params.episode,
+        per_page=params.limit,
+        page=(params.offset // params.limit) + 1,
     )
 
-    return build_rss(items, title="UTP Torznab", xseed=bool(xseed))
+    return build_rss(items, title=TITLE, xseed=params.xseed)

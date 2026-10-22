@@ -36,3 +36,4 @@ path = "ukr_torznab/__init__.py"
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["*.ipynb"]

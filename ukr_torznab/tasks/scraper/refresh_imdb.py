@@ -4,49 +4,32 @@ import zlib
 
 import httpx
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncEngine
 
+from ukr_torznab.db.tables import imdb_titles
 from ukr_torznab.tasks.base import AbstractTask
 
 logger = logging.getLogger(__name__)
 
-TABLE_NAME = "imdb_titles"
+TABLE_NAME = imdb_titles.name
 TMP_TABLE_NAME = f"{TABLE_NAME}_tmp"
 OLD_TABLE_NAME = f"{TABLE_NAME}_old"
 
-_tmp_meta = sa.MetaData()
-_imdb_titles_tmp = sa.Table(
-    TMP_TABLE_NAME,
-    _tmp_meta,
-    sa.Column("id", sa.Integer, primary_key=True),
-    sa.Column("title_type", sa.Text, nullable=True),
-    sa.Column("primary_title", sa.Text, nullable=True),
-    sa.Column("original_title", sa.Text, nullable=True),
-    sa.Column("is_adult", sa.Integer, nullable=True),
-    sa.Column("start_year", sa.Integer, nullable=True),
-    sa.Column("end_year", sa.Integer, nullable=True),
-    sa.Column("runtime_minutes", sa.Integer, nullable=True),
-    sa.Column("genres", sa.Text, nullable=True),
-)
+_imdb_titles_tmp = imdb_titles.to_metadata(sa.MetaData(), name=TMP_TABLE_NAME)
 _COLUMNS = [c.name for c in _imdb_titles_tmp.columns]
-
-_imdb_titles_main = sa.Table(
-    TABLE_NAME,
-    _tmp_meta,
-    *[col.copy() for col in _imdb_titles_tmp.columns],
-)
 
 REFRESH_INTERVAL = 5 * 60 * 60
 INSERT_BATCH_SIZE = 100_000
 
 
 class RefreshImdbTask(AbstractTask):
-    def __init__(self, engine):
+    def __init__(self, engine: AsyncEngine):
         self.engine = engine
 
     async def run_once(self):
         async with self.engine.connect() as conn:
             existing_rows = (
-                await conn.execute(sa.select(sa.func.count()).select_from(_imdb_titles_main))
+                await conn.execute(sa.select(sa.func.count()).select_from(imdb_titles))
             ).scalar()
         if existing_rows:
             logger.info(
@@ -65,16 +48,14 @@ class RefreshImdbTask(AbstractTask):
 
         logger.info("RefreshImdbTask: creating temporary table (%.1fs)", time.time() - start)
         async with self.engine.begin() as conn:
-            await conn.run_sync(_imdb_titles_main.create, checkfirst=True)
+            await conn.run_sync(imdb_titles.create, checkfirst=True)
             await conn.run_sync(_imdb_titles_tmp.create)
 
         logger.info("RefreshImdbTask: downloading IMDB titles dataset (%.1fs)", time.time() - start)
-        batch = []
+        batch: list[tuple] = []
         buffer = bytearray()
-        is_first_line = True
         gzip_decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
         total_rows = 0
-        batches_inserted = 0
 
         async with (
             httpx.AsyncClient() as client,
@@ -86,42 +67,15 @@ class RefreshImdbTask(AbstractTask):
             response.raise_for_status()
             async for chunk in response.aiter_bytes():
                 buffer.extend(gzip_decompressor.decompress(chunk))
-                while (pos := buffer.find(b"\n")) != -1:
-                    fields = buffer[:pos].decode("utf-8").split("\t")
-                    del buffer[: pos + 1]
-                    if is_first_line:
-                        is_first_line = False
-                        if fields and fields[0] == "tconst":
-                            continue
-                    row = self.parse_row(fields)
-                    if row:
-                        batch.append(row)
-
-                    if len(batch) >= INSERT_BATCH_SIZE:
-                        async with self.engine.begin() as conn:
-                            await conn.execute(
-                                _imdb_titles_tmp.insert(),
-                                [dict(zip(_COLUMNS, r)) for r in batch],
-                            )
-                        total_rows += len(batch)
-                        batches_inserted += 1
-                        batch = []
+                batch.extend(self._drain_rows(buffer))
+                if len(batch) >= INSERT_BATCH_SIZE:
+                    total_rows += await self._insert_batch(batch)
+                    batch = []
 
         buffer.extend(gzip_decompressor.flush())
-        while (pos := buffer.find(b"\n")) != -1:
-            fields = buffer[:pos].decode("utf-8").split("\t")
-            row = self.parse_row(fields)
-            if row:
-                batch.append(row)
-            del buffer[: pos + 1]
-
+        batch.extend(self._drain_rows(buffer))
         if batch:
-            async with self.engine.begin() as conn:
-                await conn.execute(
-                    _imdb_titles_tmp.insert(),
-                    [dict(zip(_COLUMNS, r)) for r in batch],
-                )
-            total_rows += len(batch)
+            total_rows += await self._insert_batch(batch)
 
         logger.info(
             "RefreshImdbTask: download complete — %d rows inserted (%.1fs)",
@@ -144,6 +98,27 @@ class RefreshImdbTask(AbstractTask):
                 await conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE);")
 
         logger.info("RefreshImdbTask: refresh complete (%.1fs)", time.time() - start)
+
+    async def _insert_batch(self, batch: list[tuple]) -> int:
+        async with self.engine.begin() as conn:
+            await conn.execute(
+                _imdb_titles_tmp.insert(),
+                [dict(zip(_COLUMNS, r)) for r in batch],
+            )
+        return len(batch)
+
+    def _drain_rows(self, buffer: bytearray) -> list[tuple]:
+        """Consume complete lines from ``buffer`` and return the parsed rows."""
+        rows = []
+        while (pos := buffer.find(b"\n")) != -1:
+            fields = buffer[:pos].decode("utf-8").split("\t")
+            del buffer[: pos + 1]
+            if fields and fields[0] == "tconst":
+                continue
+            row = self.parse_row(fields)
+            if row:
+                rows.append(row)
+        return rows
 
     @staticmethod
     def parse_row(fields: list[str]):

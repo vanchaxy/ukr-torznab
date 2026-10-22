@@ -1,6 +1,6 @@
 # toloka-torznab
 
-A [Torznab](https://torznab.github.io/spec-1.3-draft/) indexer for [toloka.to](https://toloka.to) — a Ukrainian torrent tracker. Integrates with Sonarr, Radarr, and Prowlarr.
+A [Torznab](https://torznab.github.io/spec-1.3-draft/) indexer for [toloka.to](https://toloka.to), a Ukrainian torrent tracker. Works with Sonarr, Radarr and Prowlarr. It can also proxy [utp.to](https://utp.to) and rename finished downloads in qBittorrent.
 
 ## Quick Start
 
@@ -10,13 +10,13 @@ cp .env.example .env
 docker compose up
 ```
 
-Verify the API is running:
+Check that the API is running:
 
 ```bash
-curl "http://localhost:8000/api?t=caps"
+curl "http://localhost:8000/toloka/api?t=caps"
 ```
 
-To add the indexer in Prowlarr: go to **Indexers → Add → Generic Torznab**, set the URL to `http://localhost:8000` and leave the API key blank.
+To add the indexer in Prowlarr, go to **Indexers → Add → Generic Torznab**, set the URL to `http://localhost:8000/toloka` and leave the API key blank. For UTP, use `http://localhost:8000/utp`.
 
 ---
 
@@ -24,134 +24,141 @@ To add the indexer in Prowlarr: go to **Indexers → Add → Generic Torznab**, 
 
 **Docker Compose (recommended):** Docker 24+ with Compose v2.
 
-**Local dev:** Python 3.13, plus `libtorrent` available as a system package or wheel (see [libtorrent docs](https://libtorrent.org/python_binding.html)).
+**Local dev:** Python 3.13. The `libtorrent` wheel from PyPI is enough on Linux x86_64. Elsewhere, see the [libtorrent docs](https://libtorrent.org/python_binding.html).
 
 ---
 
 ## Components
 
-toloka.to is a Ukrainian tracker focused on Ukrainian-language content: films, TV series, and documentaries with Ukrainian dubbing, voice-over, or subtitles. This project makes its catalogue searchable through the standard Torznab API that Sonarr, Radarr, and Prowlarr understand.
+toloka.to focuses on Ukrainian-language content: films, TV series and documentaries with Ukrainian dubbing, voice-over or subtitles. This project makes its catalogue searchable through the standard Torznab API.
 
-The project has three components that run as a single process:
+Everything runs in a single process: a FastAPI server plus a set of async background tasks.
 
 ### 1. Scraper
 
-Continuously monitors and indexes all torrent releases from toloka.to.
+Continuously indexes toloka.to releases.
 
 **What it does:**
-- Fetches the topic list from all relevant categories (Ukrainian dub, Ukrainian subs, HD Ukrainian, etc.)
-- Downloads the HTML page and `.torrent` file for each topic
+- Fetches the topic lists for every category in `TOLOKA_CATEGORIES` (`ukr_torznab/settings.py`)
+- Downloads the HTML page and the `.torrent` file for each topic
 - Parses each release to extract:
-  - Video files and episode mapping (`S##E##`)
-  - Quality: source (BluRay, WEB-DL, WEBRip…), resolution, video codec
-  - Audio: voiceover type (DUB, MVO, DVO, SVO, ORIGINAL), language(s), dubbing studio/channel
-  - Subtitle languages
-  - IMDB ID (matched against a local IMDB titles database)
-  - TVDB ID and series title/year via Skyhook (for TV)
+  - IMDB ID, matched against a local copy of the IMDB `title.basics` dataset
+  - TV: TVDB ID, series title/year and the episode list via Sonarr's Skyhook
+  - Movies: TMDB ID and title/year via Radarr's metadata API
+  - Season detection and file → `S##E##` mapping. A heuristic matcher runs first and an optional OpenAI fallback handles hard cases.
+  - Quality (BluRay, WEB-DL, WEBRip…), resolution, video codec, HDR format, edition/cut, IMAX/Open Matte, hybrid
+  - Audio type (DUB, MVO, DVO, SVO, original), audio and subtitle languages, dubbing studio/channel
   - Release group and uploader
 - Stores everything in SQLite or PostgreSQL
 
-**Tasks that run in parallel:**
+**Background tasks:**
 
 | Task | Description |
 |---|---|
-| `CheckNewTopicsTask` | Polls toloka.to for new or updated torrents |
-| `RefreshTopicsTask` | Periodically re-checks all known topics for seeder/size changes |
-| `DownloadTopicsTask` | Downloads HTML + `.torrent` for topics that need (re-)parsing |
-| `RefreshImdbTask` | Downloads and keeps the IMDB title database up to date |
-| `ParseTopicsTask` | Parses downloaded pages into structured release records |
-
-**Remote scraper (ElectricSQL sync):**
-
-Running the full scraper requires toloka.to credentials, uses OpenAI API calls for title parsing, and downloads the full IMDB database. As an alternative, one person running the scraper with PostgreSQL can expose the database via [ElectricSQL](https://electric-sql.com/). Other users can then set `ELECTRIC_URL` to subscribe to that endpoint and receive pre-scraped data locally — without running the scraper themselves.
+| `CheckNewTopicsTask` | Polls recently active categories every 10 minutes |
+| `RefreshTopicsTask` | Re-walks every page of every category every ~10 hours (seeders, size, updates) |
+| `DownloadTopicsTask` | Downloads HTML and `.torrent` for new or changed topics |
+| `RefreshImdbTask` | Downloads the IMDB dataset and swaps it in atomically every 5 hours |
+| `ParseTopicsTask` | Turns downloaded pages into `release` rows. Pages are re-parsed when they change or when `PARSER_VERSION` is bumped. |
 
 ### 2. Torznab API
 
-A FastAPI app that exposes the scraped data as a Torznab-compatible feed on port `8000`.
+A FastAPI app on port `8000` with one Torznab endpoint per tracker.
 
 **Endpoints:**
-- `GET /api?t=caps` — capabilities declaration
-- `GET /api?t=search&q=...` — full-text search
-- `GET /api?t=tvsearch&tvdbid=...&season=1&ep=5` — TV search with TVDB ID, season, episode
-- `GET /api?t=movie&imdbid=tt1234567` — movie search by IMDB ID
-- `GET /download/{download_id}` — proxies the `.torrent` file from toloka.to
+- `GET /toloka/api?t=caps`: capabilities
+- `GET /toloka/api?t=search&q=...`: full-text search over topic name and title
+- `GET /toloka/api?t=tvsearch&tvdbid=...&season=1&ep=5`: TV search (`imdbid` also accepted)
+- `GET /toloka/api?t=movie&imdbid=tt1234567`: movie search (`tmdbid` also accepted)
+- `GET /toloka/download/{download_id}`: proxies the `.torrent` file from toloka.to with the scraper's session
+- `GET /utp/api?...`: the same Torznab interface, backed by the utp.to API (requires `UTP_API_KEY`)
+
+All search functions accept `cat`, `offset`, `limit` (max 100) and `xseed=1`. With `xseed=1` the release group suffix is dropped from titles, which helps cross-seed matching.
+
+Only toloka topics seen on the tracker within the last 2 days are returned.
 
 **Release naming:**
 
-All release titles follow a tracker-style format that Sonarr and Radarr can parse for quality detection:
+Titles use a scene-style format that Sonarr and Radarr can parse:
 
 ```
-Title Year [S##E##] Source Resolution VCodec AudioType AudioLang [Sub.SubLang] [Studio]-Group-ID#####
+Title [Year|S##E##] [Cut] [IMAX] [Hybrid] Resolution Source Codec [HDR] AudioType AudioLangs [subXXX] [Studios]-Group
 ```
 
 Examples:
 ```
-The Bear 2022 S02E06 WEB-DL 1080p x265 DUB Ukrainian Sub.Ukrainian STB-username-ID98765
-Dune 2021 BluRay 2160p x265 DUB+MVO Ukrainian+English Sub.Ukrainian Postmodern-author-ID12345
+The Bear S02E06 1080p WEB-DL H.265 DUB Ukrainian subUKR STB-username
+Dune 2021 2160p BluRay H.265 HDR DUB.MVO English.Ukrainian subUKR Postmodern-group
 ```
 
-**Handling multi-season and incomplete season packs:**
+**Season packs:**
 
-toloka.to commonly uses rolling season packs (episodes added to an existing torrent over time) and multi-season packs. The API handles these as follows:
+toloka.to often uses rolling season packs, where episodes are added to an existing torrent over time. For a pack that is not marked complete, the feed shows an episode range (`S01E01-08`) built from the file → episode map. Sonarr then grabs the updated torrent as new episodes appear. Multi-season packs are skipped during parsing.
 
-- **Multi-season pack** — treated as a single-season release using the season with the most files.
-- **Incomplete season pack** — exposed as a single-episode release using the highest episode number present. This allows Sonarr to grab each updated version as new episodes are added.
+### 3. Renamer (optional)
 
-### 3. Renamer
-
-Renames files downloaded by qBittorrent to proper tracker-style names and resumes them.
+Renames torrents downloaded by qBittorrent to the same scene-style names, then resumes them. It's enabled by setting `QBITTORRENT_URL`.
 
 **Workflow:**
-1. Sonarr/Radarr are configured to add new downloads as **paused** in qBittorrent
-2. `RenameTorrentsTask` polls qBittorrent every 60 seconds for paused torrents
-3. It matches them against the `release` table by infohash (SHA1 → SHA256)
-4. Files are renamed according to the naming scheme, then the torrent is resumed
+1. Configure Sonarr/Radarr to add downloads to qBittorrent as **stopped**, in one of the `QBITTORRENT_CATEGORIES`.
+2. `RenameTorrentsTask` polls qBittorrent every 60 seconds for stopped torrents that don't carry the rename or rename-error tag yet.
+3. Toloka torrents are matched to `release` rows by infohash (SHA256 of the SHA1 infohash). UTP torrents are looked up through the UTP API using the torrent comment URL.
+4. The torrent, its files and its top folder are renamed. Then the torrent is tagged `QBITTORRENT_RENAME_TAG`, rechecked and started. On failure it is tagged `QBITTORRENT_RENAME_ERROR_TAG` and left alone.
 
 **Naming rules:**
-- **TV episodes** — each file renamed to `Title Year S##E## Source Resolution VCodec AudioType AudioLang Sub.SubLang Studio-Group.mkv`; torrent folder renamed to `Title (Year) S##-ID#####` (single season) or `Title (Year)-ID#####` (multi-season)
-- **Movies** — file renamed to the full tracker name; folder (if present) gets the same base name without extension
-- Files not found in the episode map (extras, samples) are left untouched
+- **TV episodes:** each mapped file becomes `<episode release name>.<ext>`, and the folder becomes `<season release name> [<id>]-group`. Files missing from the episode map (extras, samples) are left untouched.
+- **Movies:** the file gets the full release name, and the folder (if any) gets the release name with `[<id>]`.
+
+### 4. ElectricSQL consumer mode (optional)
+
+Running the scraper needs toloka.to credentials and the IMDB dataset, and optionally OpenAI. Instead, one instance can run the scraper on PostgreSQL and publish the `topic` and `release` tables through [ElectricSQL](https://electric-sql.com/). Other instances set `ELECTRIC_URL` and replace the scraper tasks with `ElectricConsumerTask`, which streams those tables into their local database. Toloka credentials are still required so `/toloka/download` can fetch `.torrent` files.
+
+On the publishing side, set `CREATE_ELECTRIC_PUBLICATION=1` and `ELECTRIC_USER_PASSWORD` before the first migration. This creates the `electric_user` role and the publication.
 
 ---
 
 ## Configuration
 
-All configuration is via environment variables. Copy `.env.example` to `.env` and fill in the required values.
+All configuration comes from environment variables. Copy `.env.example` to `.env` and fill in the required values.
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | SQLAlchemy async URL — `sqlite+aiosqlite:///toloka.db` or `postgresql+asyncpg://...` |
+| `DATABASE_URL` | Yes | SQLAlchemy async URL, either `sqlite+aiosqlite:///toloka.db` or `postgresql+asyncpg://...` |
 | `TOLOKA_USERNAME` | Yes | toloka.to login |
 | `TOLOKA_PASSWORD` | Yes | toloka.to password |
-| `API_PORT` | No | Torznab API port (default: `8000`) |
-| `ELECTRIC_URL` | No | ElectricSQL endpoint for remote scraper mode |
-| `OPENAI_API_KEY` | No | Enables LLM-based episode mapping fallback during parsing |
-| `QBITTORRENT_URL` | No | qBittorrent Web API URL — enables the renamer |
-| `QBITTORRENT_USERNAME` | No | qBittorrent username (default: `admin`) |
-| `QBITTORRENT_PASSWORD` | No | qBittorrent password (default: `adminadmin`) |
+| `API_PORT` | No | API port (default: `8000`) |
 | `LOG_LEVEL` | No | Logging level (default: `INFO`) |
+| `OPENAI_API_KEY` | No | Enables the LLM fallback for file → episode mapping |
+| `UTP_API_KEY` | No | Enables the `/utp/api` proxy and renaming of UTP torrents |
+| `ELECTRIC_URL` | No | ElectricSQL endpoint. Switches to consumer mode. |
+| `CREATE_ELECTRIC_PUBLICATION` | No | PostgreSQL only. Creates the Electric role and publication during migration. |
+| `ELECTRIC_USER_PASSWORD` | With the above | Password for `electric_user` |
+| `QBITTORRENT_URL` | No | qBittorrent Web UI URL. Enables the renamer. |
+| `QBITTORRENT_USERNAME` | No | default: `admin` |
+| `QBITTORRENT_PASSWORD` | No | default: `adminadmin` |
+| `QBITTORRENT_CATEGORIES` | No | Comma-separated categories to process (default: `tv,movies`) |
+| `QBITTORRENT_RENAME_TAG` | No | Tag added after a successful rename (default: `renamed`) |
+| `QBITTORRENT_RENAME_ERROR_TAG` | No | Tag added after a failed rename (default: `rename-error`) |
 
-`TOLOKA_USERNAME` and `TOLOKA_PASSWORD` have no defaults — the process exits immediately on startup if either is missing.
+`DATABASE_URL`, `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` have no defaults. The process fails on startup if any of them is missing.
+
+Database migrations run automatically on startup.
 
 ---
 
 ## Running with Docker Compose
 
-The included `docker-compose.yml` starts the full stack with PostgreSQL and ElectricSQL.
+The included `docker-compose.yml` is a development stack:
 
-```bash
-cp .env.example .env
-# Fill in TOLOKA_USERNAME and TOLOKA_PASSWORD
-docker compose up
-```
+- **app**: this project, installed from the working directory, on port `8000`
+- **postgres**: PostgreSQL 17 with logical replication enabled
+- **electric**: ElectricSQL sync gateway on port `3000`
+- **sonarr** / **prowlarr**: on ports `8989` / `9696`, for testing the indexer end to end
 
-Docker Compose automatically loads `.env` from the working directory.
+Docker Compose loads `.env` from the working directory. To use PostgreSQL, set
+`DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/toloka`.
 
-Services:
-- **app** — scraper + Torznab API on port `8000`
-- **postgres** — PostgreSQL 17 with logical replication enabled
-- **electric** — ElectricSQL sync gateway on port `3000`
-- **prowlarr** — Prowlarr on port `9696` for testing the indexer
+A production image is built by `.github/workflows/docker-build-push.yml` and pushed to `ghcr.io`. The version in `ukr_torznab/__init__.py` must be an `rc` version on branches and a non-`rc` version on `main`.
 
 ---
 
@@ -163,7 +170,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Run with SQLite (no Docker required):
+Run with SQLite:
 
 ```bash
 export DATABASE_URL=sqlite+aiosqlite:///toloka.db
@@ -176,25 +183,37 @@ Lint and type-check:
 
 ```bash
 ruff check .
-mypy .
+mypy ukr_torznab
 ```
 
 ---
 
 ## Architecture
 
-Data flows through four stages:
-
 ```
 CheckNew/Refresh ──► DownloadTopics ──► ParseTopics ──► Torznab API
-     (poll tracker         (fetch HTML          (extract title,       (serve RSS
-      for new/updated       + .torrent           quality, episodes,     to Sonarr/
-      topic IDs)            per topic)           IMDB/TVDB IDs)        Radarr)
+ (poll tracker,        (fetch HTML        (IMDB/Skyhook/      (RSS for
+  upsert topic rows)    + .torrent         Radarr lookups,     Sonarr/Radarr)
+                        into page)         write release)
 ```
 
-Each stage is an async background task. `CheckNew` and `Refresh` write topic IDs that need downloading; `Download` writes raw HTML and torrent bytes; `Parse` converts those into structured `release` rows that the API queries.
+Each stage is an async background task that communicates only through the database. `topic` rows carry a hash of the listing fields, and a hash change triggers a re-download. A newer `page.downloaded_at` or a lower `release.parser_version` triggers a re-parse.
 
-**ElectricSQL consumer mode:** if `ELECTRIC_URL` is set, the first three stages are replaced by `ElectricConsumerTask`, which subscribes to a remote PostgreSQL database over the ElectricSQL sync protocol and writes the same `release` rows locally. This lets users run only the API without toloka.to credentials or OpenAI access.
+```
+ukr_torznab/
+  main.py            wiring: migrations, clients, tasks, uvicorn
+  settings.py        env vars and toloka category list
+  api/               FastAPI routers (/toloka, /utp), caps and RSS builders
+  clients/           HTTP clients: toloka, skyhook, servarr, qbittorrent, utp, openai
+  db/                SQLAlchemy Core tables, queries, cross-dialect upsert
+  models/            enums (quality, codec, language, studio…) and the Release model with naming rules
+  tasks/
+    scraper/         check/refresh/download/imdb tasks
+      parse_topics/  the page parser (processor.py is the entry point)
+    renamer.py       qBittorrent renamer
+    consumer.py      ElectricSQL consumer
+migrations/          Alembic migrations (hand-written)
+```
 
 ---
 
@@ -202,9 +221,10 @@ Each stage is an async background task. `CheckNew` and `Refresh` write topic IDs
 
 | Table | Purpose |
 |---|---|
-| `topic` | Raw torrent metadata from toloka.to (name, size, seeders, hash) |
-| `page` | Downloaded HTML and `.torrent` binary for each topic |
-| `release` | Parsed release data — the join point for all API queries: title, year, IMDB/TVDB IDs, quality, codec, audio, episode map |
-| `imdb_titles` | Local IMDB title database used for ID matching during parsing |
+| `topic` | Topic listing data from toloka.to (name, category, size, seeders, status, change hash) |
+| `page` | Downloaded HTML and `.torrent` for each topic |
+| `release` | Parsed release data that the API and renamer query. `result` is `ok` or a skip reason. |
+| `imdb_titles` | Local IMDB title database used for ID matching |
 | `skyhook` | Cached Skyhook responses (TVDB series metadata) |
+| `servarr` | Cached Radarr metadata responses (TMDB movie metadata) |
 | `electric_offset` | Resume offsets for ElectricSQL shape subscriptions |

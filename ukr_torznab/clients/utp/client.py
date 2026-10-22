@@ -1,9 +1,10 @@
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 
 import httpx
-from httpx_limiter import AsyncRateLimitedTransport, Rate
-from httpx_limiter.aiolimiter import AiolimiterAsyncLimiter
+from httpx_limiter import Rate
+
+from ukr_torznab.clients._http import make_client
 
 from ukr_torznab.clients.utp.parser import (
     parse_audio_tracks,
@@ -20,12 +21,13 @@ from ukr_torznab.models import (
     Release,
     Tracker,
 )
+from ukr_torznab.utils import EPOCH
 
 logger = logging.getLogger(__name__)
 
 
-def dvf(freeleech) -> str:
-    if not freeleech or freeleech is False:
+def _download_volume_factor(freeleech) -> str:
+    if not freeleech:
         return "1"
     if isinstance(freeleech, str) and freeleech.endswith("%"):
         pct = float(freeleech[:-1])
@@ -37,12 +39,10 @@ def dvf(freeleech) -> str:
 class UtpClient:
     def __init__(self, api_key: str) -> None:
         self._api_key = api_key
-        self._client = httpx.AsyncClient(
-            base_url="https://utp.to/api/torrents",
+        self._client = make_client(
+            "https://utp.to/api/torrents",
+            rate=Rate.create(1, 1),
             timeout=30,
-            transport=AsyncRateLimitedTransport.create(
-                AiolimiterAsyncLimiter.create(Rate.create(1, 1)),
-            ),
         )
 
     async def search(
@@ -124,13 +124,13 @@ def transform_utp_item(item: dict) -> Release:
         audio_types, audio_sources, audio_langs = parse_audio_tracks(mi)
         subtitle_langs = parse_subtitle_langs(mi)
 
-    registered_at = None
+    registered_at = EPOCH
     created_at_str = attrs.get("created_at")
     if created_at_str:
         try:
             registered_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
         except (ValueError, AttributeError):
-            registered_at = datetime(1970, 1, 1, tzinfo=UTC)
+            pass
 
     return Release(
         id=int(item["id"]),
@@ -162,7 +162,7 @@ def transform_utp_item(item: dict) -> Release:
         details_link=attrs.get("details_link"),
         registered_at=registered_at,
         grabs=attrs.get("times_completed", 0),
-        download_volume_factor=dvf(attrs.get("freeleech")),
+        download_volume_factor=_download_volume_factor(attrs.get("freeleech")),
         upload_volume_factor="2" if attrs.get("double_upload") or attrs.get("featured") else "1",
         minimum_ratio="0.4",
         minimum_seedtime="259200",

@@ -1,4 +1,3 @@
-import os
 import re
 from collections import defaultdict
 
@@ -14,7 +13,7 @@ from ukr_torznab.models import (
     Resolution,
     VideoFormat,
 )
-from ukr_torznab.utils import VIDEO_EXTENSIONS
+from ukr_torznab.utils import is_video, positional_numbers, unique_numbers_by_pattern
 
 QUALITY_RE = re.compile(
     r"(?i)\b(?:1080[pi]|2160p|"
@@ -93,45 +92,18 @@ _EPISODE_PATTERNS = [
 ]
 
 
-def _try_pattern(pattern: str, files: list[str]) -> dict[str, int] | None:
-    results: dict[str, int] = {}
-    for f in files:
-        m = re.findall(pattern, f, re.IGNORECASE)
-        if m:
-            results[f] = int(m[0])
-    if len(results) == len(files) and len(set(results.values())) == len(files):
-        return results
-    return None
-
-
-def _positional(files: list[str]) -> dict[str, int] | None:
-    if len(files) <= 1:
-        return None
-    all_nums = [re.findall(r"\d+", f) for f in files]
-    if len(set(len(n) for n in all_nums)) != 1:
-        return None
-    for col in range(len(all_nums[0])):
-        vals = [int(n[col]) for n in all_nums]
-        if len(set(vals)) == len(files):
-            return {f: int(n[col]) for f, n in zip(files, all_nums)}
-    return None
-
-
 def _extract_episode_numbers(basenames: list[str]) -> dict[str, int] | None:
     for pat in _EPISODE_PATTERNS:
-        result = _try_pattern(pat, basenames)
+        result = unique_numbers_by_pattern(pat, basenames)
         if result:
             return result
-    return _positional(basenames)
+    return positional_numbers(basenames)
 
 
 def build_file_to_episode(season: int, files: list[dict]) -> dict[str, list[int]] | None:
-    video_files = [
-        f for f in files if os.path.splitext(f.get("name", ""))[1].lower() in VIDEO_EXTENSIONS
-    ]
-    if not video_files:
+    paths = [f["name"] for f in files if is_video(f.get("name", ""))]
+    if not paths:
         return None
-    paths = [f["name"] for f in video_files]
     ep_map = _extract_episode_numbers(paths)
     if ep_map is None:
         return None
@@ -139,9 +111,9 @@ def build_file_to_episode(season: int, files: list[dict]) -> dict[str, list[int]
     return {filename.lower(): [season, ep] for filename, ep in ep_map.items()}
 
 
-def parse_release(name: str, type: str, resolution: str, files: list, is_tv: bool) -> dict:
+def parse_release(name: str, type: str, resolution_str: str, files: list, is_tv: bool) -> dict:
     quality = QUALITY_MAP.get(type, Quality.UNKNOWN)
-    resolution = RESOLUTION_MAP.get(resolution, Resolution.UNKNOWN)
+    resolution = RESOLUTION_MAP.get(resolution_str, Resolution.UNKNOWN)
 
     group = None
     gm = GROUP_RE.search(name)
@@ -332,9 +304,9 @@ def parse_audio_tracks(
             audio_sources.add(studio)
 
     return (
-        sorted(audio_types, key=lambda l: l.value),
-        sorted(audio_sources, key=lambda l: l.name),
-        sorted(audio_langs, key=lambda l: l.value),
+        sorted(audio_types, key=lambda t: t.value),
+        sorted(audio_sources, key=lambda s: s.name),
+        sorted(audio_langs, key=lambda lang: lang.value),
     )
 
 
@@ -345,4 +317,4 @@ def parse_subtitle_langs(
     for track in mediainfo.get("Text", []):
         lang = _parse_lang(track.get("Language", ""))
         langs.add(lang)
-    return sorted(langs, key=lambda l: l.value)
+    return sorted(langs, key=lambda lang: lang.value)

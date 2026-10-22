@@ -1,38 +1,18 @@
-import json
-from datetime import UTC, datetime, timedelta
-
-import httpx
-from httpx_limiter import AsyncRateLimitedTransport, Rate
-from httpx_limiter.aiolimiter import AiolimiterAsyncLimiter
-from sqlalchemy import select
+from httpx_limiter import Rate
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from ukr_torznab.clients._cache import read_cached, write_cached
+from ukr_torznab.clients._http import BROWSER_HEADERS, make_client
 from ukr_torznab.db.tables import servarr as servarr_table
-from ukr_torznab.db.upsert import upsert
 
 
 class ServarrClient:
     def __init__(self) -> None:
-        self._client = httpx.AsyncClient(
-            base_url="https://radarrapi.servarr.com/v1",
+        self._client = make_client(
+            "https://radarrapi.servarr.com/v1",
+            rate=Rate.create(1, 1),
             follow_redirects=True,
-            headers={
-                "accept": (
-                    "text/html,application/xhtml+xml,application/xml;q=0.9,"
-                    "image/avif,image/webp,image/apng,*/*;q=0.8,"
-                    "application/signed-exchange;v=b3;q=0.7"
-                ),
-                "accept-language": "en-US,en;q=0.9,uk;q=0.8,ru;q=0.7,cs;q=0.6",
-                "cache-control": "max-age=0",
-                "user-agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/135.0.0.0 Safari/537.36"
-                ),
-            },
-            transport=AsyncRateLimitedTransport.create(
-                AiolimiterAsyncLimiter.create(Rate.create(1, 1)),
-            ),
+            headers=BROWSER_HEADERS,
         )
 
     async def get_metadata(
@@ -40,15 +20,9 @@ class ServarrClient:
         conn: AsyncConnection,
         imdb_id: int,
     ) -> dict | None:
-        row = (
-            await conn.execute(
-                select(servarr_table).where(servarr_table.c.imdbid == imdb_id),
-            )
-        ).first()
-        if row is not None:
-            ttl = timedelta(days=7) if row.response else timedelta(days=1)
-            if datetime.now(UTC) - row.updated_at.replace(tzinfo=UTC) < ttl:
-                return json.loads(row.response) if row.response else None
+        fresh, cached = await read_cached(conn, servarr_table, imdb_id)
+        if fresh:
+            return cached
 
         imdb_str = f"tt{imdb_id:07d}"
         tmdb_id: int | None = None
@@ -56,24 +30,20 @@ class ServarrClient:
 
         r = await self._client.get(f"movie/imdb/{imdb_str}")
         if r.status_code == 200:
-            results = r.json()
-            for entry in results:
+            for entry in r.json():
                 if entry.get("ImdbId") == imdb_str:
                     tmdb_id = entry.get("TmdbId")
                     response_data = entry
                     break
 
-        values = {
-            "tmdbid": tmdb_id,
-            "response": json.dumps(response_data) if response_data else None,
-            "updated_at": datetime.now(UTC),
-        }
-        await conn.execute(
-            upsert(servarr_table, conn)
-            .values({"imdbid": imdb_id, **values})
-            .on_conflict_do_update(index_elements=["imdbid"], set_=values),
+        await write_cached(
+            conn,
+            servarr_table,
+            imdb_id,
+            external_id_col="tmdbid",
+            external_id=tmdb_id,
+            response=response_data,
         )
-
         return response_data
 
     async def close(self) -> None:

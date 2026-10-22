@@ -17,7 +17,7 @@ from ukr_torznab.settings import (
     QBITTORRENT_RENAME_TAG,
 )
 from ukr_torznab.tasks.base import AbstractTask
-from ukr_torznab.utils import VIDEO_EXTENSIONS
+from ukr_torznab.utils import is_video
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def _top_folder(files: list[dict]) -> str | None:
 
 
 def _filter_videos(files: list[dict]) -> list[dict]:
-    return [f for f in files if os.path.splitext(f.get("name", ""))[1].lower() in VIDEO_EXTENSIONS]
+    return [f for f in files if is_video(f.get("name", ""))]
 
 
 def _target_folder(release: Release) -> str:
@@ -107,7 +107,7 @@ class RenameTorrentsTask(AbstractTask):
         for release in releases:
             if not self.running:
                 return
-            qbt_hash = sha256_to_qbt.get(release.infohash_sha256)
+            qbt_hash = sha256_to_qbt.get(release.infohash_sha256 or "")
             if qbt_hash is None:
                 continue
             try:

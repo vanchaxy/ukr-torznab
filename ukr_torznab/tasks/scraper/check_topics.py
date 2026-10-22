@@ -1,7 +1,9 @@
 import logging
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncEngine
 
+from ukr_torznab.clients.toloka import TolokaClient
 from ukr_torznab.db.queries import upsert_topic
 from ukr_torznab.db.tables import topic as topic_table
 from ukr_torznab.settings import TOLOKA_CATEGORIES
@@ -11,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class RefreshTopicsTask(AbstractTask):
-    def __init__(self, client, engine):
+    def __init__(self, client: TolokaClient, engine: AsyncEngine):
         self.client = client
         self.engine = engine
 
@@ -56,7 +58,7 @@ class RefreshTopicsTask(AbstractTask):
 
 
 class CheckNewTopicsTask(AbstractTask):
-    def __init__(self, client, engine):
+    def __init__(self, client: TolokaClient, engine: AsyncEngine):
         self.client = client
         self.engine = engine
 

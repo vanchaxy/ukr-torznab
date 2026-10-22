@@ -1,8 +1,8 @@
 import asyncio
 import gc
 import logging
-import os
 import signal
+from contextlib import AsyncExitStack
 from pathlib import Path
 
 import httpx
@@ -17,6 +17,7 @@ from ukr_torznab.settings import (
     API_PORT,
     DATABASE_URL,
     ELECTRIC_URL,
+    LOG_LEVEL,
     OPENAI_API_KEY,
     QBITTORRENT_PASSWORD,
     QBITTORRENT_URL,
@@ -43,9 +44,8 @@ def _run_migrations() -> None:
 
 
 def _configure_logging() -> None:
-    level = os.environ.get("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
-        level=getattr(logging, level, logging.INFO),
+        level=getattr(logging, LOG_LEVEL, logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
@@ -56,125 +56,122 @@ async def main():
     _run_migrations()
     gc.collect()
 
-    engine = create_async_engine(DATABASE_URL, connect_args={"timeout": 30})
+    async with AsyncExitStack() as stack:
+        engine = create_async_engine(DATABASE_URL, connect_args={"timeout": 30})
+        stack.push_async_callback(engine.dispose)
 
-    toloka_client = TolokaClient(username=TOLOKA_USERNAME, password=TOLOKA_PASSWORD)
-    await toloka_client.login()
+        toloka_client = TolokaClient(username=TOLOKA_USERNAME, password=TOLOKA_PASSWORD)
+        stack.push_async_callback(toloka_client.close)
+        await toloka_client.login()
 
-    api_app.state.engine = engine
-    api_app.state.toloka_client = toloka_client
+        api_app.state.engine = engine
+        api_app.state.toloka_client = toloka_client
 
-    utp_client = None
-    if UTP_API_KEY:
-        from ukr_torznab.clients.utp import UtpClient
+        utp_client = None
+        if UTP_API_KEY:
+            from ukr_torznab.clients.utp import UtpClient
 
-        utp_client = UtpClient(api_key=UTP_API_KEY)
-        logger.info("UTP client enabled")
-    api_app.state.utp_client = utp_client
+            utp_client = UtpClient(api_key=UTP_API_KEY)
+            stack.push_async_callback(utp_client.close)
+            logger.info("UTP client enabled")
+        api_app.state.utp_client = utp_client
 
-    tasks: list[AbstractTask] = []
-    electric_client: httpx.AsyncClient | None = None
-    skyhook_client = None
-    servarr_client = None
-    openai_client = None
+        tasks: list[AbstractTask] = []
 
-    if ELECTRIC_URL:
-        logger.info(
-            "Starting in consumer mode (ELECTRIC_URL=%s)",
-            ELECTRIC_URL,
-        )
-        from ukr_torznab.tasks.consumer import ElectricConsumerTask
+        if ELECTRIC_URL:
+            logger.info("Starting in consumer mode (ELECTRIC_URL=%s)", ELECTRIC_URL)
+            from ukr_torznab.tasks.consumer import ElectricConsumerTask
 
-        electric_client = httpx.AsyncClient()
-        for table in (topic, release):
-            tasks.append(
-                ElectricConsumerTask(
-                    engine=engine,
-                    client=electric_client,
-                    electric_url=ELECTRIC_URL,
-                    table=table,
-                ),
+            electric_client = httpx.AsyncClient()
+            stack.push_async_callback(electric_client.aclose)
+            for table in (topic, release):
+                tasks.append(
+                    ElectricConsumerTask(
+                        engine=engine,
+                        client=electric_client,
+                        electric_url=ELECTRIC_URL,
+                        table=table,
+                    ),
+                )
+        else:
+            logger.info("Starting in scraper mode")
+            from openai import AsyncOpenAI
+
+            from ukr_torznab.clients.servarr import ServarrClient
+            from ukr_torznab.clients.skyhook import SkyhookClient
+            from ukr_torznab.tasks.scraper import (
+                CheckNewTopicsTask,
+                DownloadTopicsTask,
+                ParseTopicsTask,
+                RefreshImdbTask,
+                RefreshTopicsTask,
             )
-    else:
-        logger.info("Starting in scraper mode")
-        from openai import AsyncOpenAI
 
-        from ukr_torznab.clients.servarr import ServarrClient
-        from ukr_torznab.clients.skyhook import SkyhookClient
-        from ukr_torznab.tasks.scraper import (
-            CheckNewTopicsTask,
-            DownloadTopicsTask,
-            ParseTopicsTask,
-            RefreshImdbTask,
-            RefreshTopicsTask,
+            skyhook_client = SkyhookClient()
+            stack.push_async_callback(skyhook_client.close)
+            servarr_client = ServarrClient()
+            stack.push_async_callback(servarr_client.close)
+            openai_client = None
+            if OPENAI_API_KEY:
+                openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+                stack.push_async_callback(openai_client.close)
+
+            tasks = [
+                CheckNewTopicsTask(client=toloka_client, engine=engine),
+                RefreshTopicsTask(client=toloka_client, engine=engine),
+                DownloadTopicsTask(client=toloka_client, engine=engine),
+                RefreshImdbTask(engine=engine),
+                ParseTopicsTask(
+                    engine=engine,
+                    skyhook_client=skyhook_client,
+                    servarr_client=servarr_client,
+                    openai_client=openai_client,
+                ),
+            ]
+
+        if QBITTORRENT_URL:
+            from ukr_torznab.clients.qbittorrent import QBittorrentClient
+            from ukr_torznab.tasks.renamer import RenameTorrentsTask
+
+            qbt_client = QBittorrentClient(
+                QBITTORRENT_URL,
+                QBITTORRENT_USERNAME,
+                QBITTORRENT_PASSWORD,
+            )
+            stack.push_async_callback(qbt_client.close)
+            await qbt_client.login()
+            tasks.append(
+                RenameTorrentsTask(engine=engine, qbt_client=qbt_client, utp_client=utp_client),
+            )
+
+        for task in tasks:
+            task.start()
+
+        gc.collect()
+
+        uvicorn_config = uvicorn.Config(
+            api_app,
+            host="0.0.0.0",
+            port=API_PORT,
+            log_level="warning",
         )
+        uvicorn_server = uvicorn.Server(uvicorn_config)
 
-        skyhook_client = SkyhookClient()
-        servarr_client = ServarrClient()
-        openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+        async def stop_handler():
+            uvicorn_server.should_exit = True
+            await asyncio.gather(*[task.close() for task in tasks])
 
-        tasks = [
-            CheckNewTopicsTask(client=toloka_client, engine=engine),
-            RefreshTopicsTask(client=toloka_client, engine=engine),
-            DownloadTopicsTask(client=toloka_client, engine=engine),
-            RefreshImdbTask(engine=engine),
-            ParseTopicsTask(
-                engine=engine,
-                skyhook_client=skyhook_client,
-                servarr_client=servarr_client,
-                openai_client=openai_client,
-            ),
-        ]
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, lambda: asyncio.create_task(stop_handler()))
 
-    qbt_client = None
-    if QBITTORRENT_URL:
-        from ukr_torznab.clients.qbittorrent import QBittorrentClient
-        from ukr_torznab.tasks.renamer import RenameTorrentsTask
-
-        qbt_client = QBittorrentClient(QBITTORRENT_URL, QBITTORRENT_USERNAME, QBITTORRENT_PASSWORD)
-        await qbt_client.login()
-        tasks.append(
-            RenameTorrentsTask(engine=engine, qbt_client=qbt_client, utp_client=utp_client),
-        )
-
-    for task in tasks:
-        task.start()
-
-    gc.collect()
-
-    uvicorn_config = uvicorn.Config(api_app, host="0.0.0.0", port=API_PORT, log_level="warning")
-    uvicorn_server = uvicorn.Server(uvicorn_config)
-
-    async def stop_handler():
-        uvicorn_server.should_exit = True
-        await asyncio.gather(*[task.close() for task in tasks])
-
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda: asyncio.create_task(stop_handler()))
-
-    try:
-        await asyncio.gather(
-            uvicorn_server.serve(),
-            *[task.wait() for task in tasks],
-        )
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await engine.dispose()
-        await toloka_client.close()
-        if skyhook_client is not None:
-            await skyhook_client.close()
-        if servarr_client is not None:
-            await servarr_client.close()
-        if openai_client is not None:
-            await openai_client.close()
-        if electric_client is not None:
-            await electric_client.aclose()
-        if qbt_client is not None:
-            await qbt_client.close()
-        if utp_client is not None:
-            await utp_client.close()
+        try:
+            await asyncio.gather(
+                uvicorn_server.serve(),
+                *[task.wait() for task in tasks],
+            )
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":

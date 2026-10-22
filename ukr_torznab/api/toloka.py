@@ -1,64 +1,46 @@
-from fastapi import APIRouter, HTTPException, Request
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from ukr_torznab.api.caps import DEFAULT_LIMIT, MAX_LIMIT, caps_response
-from ukr_torznab.api.search import build_rss, content_type_filter, parse_imdbid
+from ukr_torznab.api.caps import caps_response
+from ukr_torznab.api.search import SEARCH_FUNCTIONS, SearchParams, build_rss, search_params
 from ukr_torznab.api.xml import error_xml
 from ukr_torznab.db.queries import search_releases
 
 router = APIRouter(prefix="/toloka")
 
+TITLE = "Toloka Torznab"
+
 
 @router.get("/api")
 async def torznab_api(
     request: Request,
-    t: str = "search",
-    q: str | None = None,
-    cat: str | None = None,
-    imdbid: str | None = None,
-    tvdbid: str | None = None,
-    tmdbid: str | None = None,
-    season: int | None = None,
-    ep: int | None = None,
-    offset: int = 0,
-    limit: int = DEFAULT_LIMIT,
-    xseed: int = 0,
+    params: Annotated[SearchParams, Depends(search_params)],
 ) -> Response:
-    if t == "caps":
-        return caps_response("Toloka Torznab")
+    if params.t == "caps":
+        return caps_response(TITLE)
 
-    if t not in ("search", "tvsearch", "movie"):
+    if params.t not in SEARCH_FUNCTIONS:
         return error_xml(202, "No such function")
-
-    limit = min(max(limit, 1), MAX_LIMIT)
-    offset = max(offset, 0)
-
-    content_types = content_type_filter(
-        cat,
-        force_tv=(t == "tvsearch"),
-        force_movie=(t == "movie"),
-    )
-    parsed_imdbid = parse_imdbid(imdbid)
-    parsed_tvdbid = int(tvdbid) if tvdbid and tvdbid.isdigit() else None
-    parsed_tmdbid = int(tmdbid) if tmdbid and tmdbid.isdigit() else None
 
     engine: AsyncEngine = request.app.state.engine
     async with engine.connect() as conn:
         rows = await search_releases(
             conn,
-            q=q,
-            content_types=content_types,
-            imdb_id=parsed_imdbid,
-            tvdb_id=parsed_tvdbid,
-            tmdb_id=parsed_tmdbid,
-            season=season,
-            episode=ep,
-            offset=offset,
-            limit=limit,
+            q=params.q,
+            content_types=params.content_types,
+            imdb_id=params.imdb_id,
+            tvdb_id=params.tvdb_id,
+            tmdb_id=params.tmdb_id,
+            season=params.season,
+            episode=params.episode,
+            offset=params.offset,
+            limit=params.limit,
         )
 
-    return build_rss(rows, title="Toloka Torznab", xseed=bool(xseed))
+    return build_rss(rows, title=TITLE, xseed=params.xseed)
 
 
 @router.get("/download/{download_id}")

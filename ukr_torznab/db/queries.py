@@ -83,10 +83,10 @@ async def get_topic_id_to_download(conn: AsyncConnection):
         .where(
             topic.columns.observed_at > two_days_ago,
             or_(
-                page.columns.id == None,
+                page.columns.id.is_(None),
                 topic.columns.hash_changed_at > page.columns.downloaded_at,
                 and_(
-                    or_(page.columns.html == None, page.columns.torrent == None),
+                    or_(page.columns.html.is_(None), page.columns.torrent.is_(None)),
                     page.columns.downloaded_at <= three_hours_ago,
                 ),
             ),
@@ -131,11 +131,11 @@ async def get_page_to_parse(conn: AsyncConnection):
             release.c.hash_changed_at.label("prev_hash_changed_at"),
         )
         .outerjoin(release, page.c.id == release.c.id)
-        .where(page.c.html != None)
-        .where(page.c.torrent != None)
+        .where(page.c.html.is_not(None))
+        .where(page.c.torrent.is_not(None))
         .where(
             or_(
-                release.c.id == None,
+                release.c.id.is_(None),
                 page.c.downloaded_at > release.c.parsed_at,
                 release.c.parser_version < PARSER_VERSION,
             ),
@@ -172,6 +172,42 @@ def _file_to_episode_matches(conn, season: int | None, episode: int | None):
     return exists(select(literal(1)).select_from(fte).where(*conditions))
 
 
+# Columns read by Release.from_db_row.
+_RELEASE_COLUMNS = (
+    topic.c.id,
+    topic.c.download_id,
+    topic.c.name,
+    topic.c.status,
+    topic.c.seeders,
+    topic.c.leechers,
+    release.c.content_type,
+    release.c.imdb_id,
+    release.c.tvdb_id,
+    release.c.tmdb_id,
+    release.c.title,
+    release.c.year,
+    release.c.season,
+    release.c.season_complete,
+    release.c.file_to_episode,
+    release.c.torrent_size,
+    release.c.quality,
+    release.c.resolution,
+    release.c.codec,
+    release.c.hdr,
+    release.c.cut,
+    release.c.ratio,
+    release.c.hybrid,
+    release.c.audio_types,
+    release.c.audio_sources,
+    release.c.audio_lang,
+    release.c.subtitle_lang,
+    release.c.release_group,
+    release.c.author,
+    release.c.registered_at,
+    release.c.infohash_sha256,
+)
+
+
 async def search_releases(
     conn: AsyncConnection,
     *,
@@ -186,40 +222,7 @@ async def search_releases(
     limit: int = 100,
 ) -> list[Release]:
     query = (
-        select(
-            topic.c.id,
-            topic.c.download_id,
-            topic.c.name,
-            topic.c.status,
-            topic.c.seeders,
-            topic.c.leechers,
-            release.c.content_type,
-            release.c.content_type,
-            release.c.imdb_id,
-            release.c.tvdb_id,
-            release.c.tmdb_id,
-            release.c.title,
-            release.c.year,
-            release.c.season,
-            release.c.season_complete,
-            release.c.file_to_episode,
-            release.c.torrent_size,
-            release.c.quality,
-            release.c.resolution,
-            release.c.codec,
-            release.c.audio_types,
-            release.c.audio_sources,
-            release.c.audio_lang,
-            release.c.subtitle_lang,
-            release.c.release_group,
-            release.c.author,
-            release.c.hdr,
-            release.c.cut,
-            release.c.ratio,
-            release.c.hybrid,
-            release.c.hash_changed_at,
-            release.c.registered_at,
-        )
+        select(*_RELEASE_COLUMNS)
         .join(release, topic.c.id == release.c.id)
         .where(release.c.result == "ok")
         .where(topic.c.observed_at > datetime.now().astimezone() - timedelta(days=2))
@@ -267,41 +270,8 @@ async def get_releases_by_infohash(
     infohashes: list[str],
 ) -> list[Release]:
     query = (
-        select(
-            release.c.id,
-            topic.c.name,
-            topic.c.download_id,
-            release.c.title,
-            release.c.year,
-            release.c.content_type,
-            release.c.imdb_id,
-            release.c.tvdb_id,
-            release.c.tmdb_id,
-            release.c.season,
-            release.c.season_complete,
-            release.c.last_episode,
-            release.c.file_to_episode,
-            release.c.torrent_size,
-            release.c.quality,
-            release.c.resolution,
-            release.c.codec,
-            release.c.hdr,
-            release.c.cut,
-            release.c.ratio,
-            release.c.hybrid,
-            release.c.audio_types,
-            release.c.audio_sources,
-            release.c.audio_lang,
-            release.c.subtitle_lang,
-            release.c.release_group,
-            release.c.author,
-            release.c.registered_at,
-            release.c.infohash_sha256,
-            topic.c.seeders,
-            topic.c.leechers,
-            topic.c.hash_changed_at,
-        )
-        .join(topic, release.c.id == topic.c.id)
+        select(*_RELEASE_COLUMNS)
+        .join(release, topic.c.id == release.c.id)
         .where(
             release.c.infohash_sha256.in_(infohashes),
             release.c.result == "ok",

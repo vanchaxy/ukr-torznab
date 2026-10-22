@@ -3,7 +3,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar, overload
 
 from ukr_torznab.models.aspect_ratio import AspectRatio
 from ukr_torznab.models.audio_source import AudioSource
@@ -25,19 +26,21 @@ def _sanitize(name: str) -> str:
     return _UNSAFE_RE.sub("", name).strip()
 
 
-def _decode_json_list(raw) -> list:
+def _decode_json(raw):
     if raw is None or raw == "":
-        return []
+        return None
     if isinstance(raw, str):
         try:
-            decoded = json.loads(raw)
+            return json.loads(raw)
         except (ValueError, TypeError):
-            return []
-    else:
-        decoded = raw
-    return decoded if isinstance(decoded, list) else []
+            return None
+    return raw
 
 
+@overload
+def enum_from_value(cls: type[_E], v, *, default: _E) -> _E: ...
+@overload
+def enum_from_value(cls: type[_E], v, *, default: None = None) -> _E | None: ...
 def enum_from_value(cls: type[_E], v, *, default: _E | None = None) -> _E | None:
     if v is None or v == "":
         return default
@@ -47,46 +50,34 @@ def enum_from_value(cls: type[_E], v, *, default: _E | None = None) -> _E | None
         return default
 
 
-def parse_audio_types(raw) -> list[AudioType]:
-    out: list[AudioType] = []
-    for v in _decode_json_list(raw):
+def _parse_enum_list(raw, convert: Callable[[Any], _E]) -> list[_E]:
+    decoded = _decode_json(raw)
+    if not isinstance(decoded, list):
+        return []
+    out: list[_E] = []
+    for v in decoded:
         try:
-            out.append(AudioType(v))
-        except ValueError:
+            out.append(convert(v))
+        except (KeyError, ValueError):
             continue
     return out
+
+
+def parse_audio_types(raw) -> list[AudioType]:
+    return _parse_enum_list(raw, AudioType)
 
 
 def parse_audio_sources(raw) -> list[AudioSource]:
-    out: list[AudioSource] = []
-    for v in _decode_json_list(raw):
-        try:
-            out.append(AudioSource[v])
-        except KeyError:
-            continue
-    return out
+    # Stored by member name, not value (AudioSource values are auto()).
+    return _parse_enum_list(raw, AudioSource.__getitem__)
 
 
 def parse_langs(raw) -> list[Lang]:
-    out: list[Lang] = []
-    for v in _decode_json_list(raw):
-        try:
-            out.append(Lang(v))
-        except ValueError:
-            continue
-    return out
+    return _parse_enum_list(raw, Lang)
 
 
 def parse_file_to_episode(raw) -> dict[str, list[int]] | None:
-    if raw is None or raw == "":
-        return None
-    if isinstance(raw, str):
-        try:
-            decoded = json.loads(raw)
-        except (ValueError, TypeError):
-            return None
-    else:
-        decoded = raw
+    decoded = _decode_json(raw)
     if not isinstance(decoded, dict):
         return None
     return {str(k): list(v) for k, v in decoded.items()}
@@ -215,7 +206,7 @@ class Release:
         end_episode: int | None = None,
         release_id: int | None = None,
     ) -> list[str]:
-        parts: list[str] = [_sanitize(self.title)]
+        parts: list[str | None] = [_sanitize(self.title)]
 
         if self.content_type is ContentType.TV:
             if episode is not None and end_episode is not None and end_episode != episode:
@@ -248,10 +239,10 @@ class Release:
         audio = ".".join(tag for tag in (str(t) for t in self.audio_types) if tag)
         parts.append(audio)
 
-        locale = ".".join(tag for tag in (str(l) for l in self.audio_lang) if tag)
+        locale = ".".join(tag for tag in (str(lang) for lang in self.audio_lang) if tag)
         parts.append(locale)
 
-        subs = ".".join(f"sub{c}" for c in (l.code() for l in self.subtitle_lang) if c)
+        subs = ".".join(f"sub{c}" for c in (lang.code() for lang in self.subtitle_lang) if c)
         parts.append(subs)
 
         studio = ".".join(tag for tag in (str(src) for src in self.audio_sources) if tag)
@@ -266,32 +257,26 @@ class Release:
         g = self.release_group or self.author or ""
         return re.sub(r"[^0-9a-z]", "", g.lower())
 
+    def _with_group(self, parts: list[str], suffix: str = "") -> str:
+        base = " ".join(parts)
+        group = self.group_tag()
+        return f"{base}-{group}{suffix}" if group else f"{base}{suffix}"
+
     def release_name(self, *, xseed: bool = False) -> str:
         parts = self.release_name_parts(
             season=self.season,
             episode=self.min_episode,
             end_episode=self.max_episode,
         )
-        base = " ".join(parts)
         if xseed:
-            return base + "-"
-        group = self.group_tag()
-        return f"{base}-{group}" if group else base
+            return " ".join(parts) + "-"
+        return self._with_group(parts)
 
     def movie_folder(self) -> str:
-        parts = self.release_name_parts(release_id=self.id)
-        base = " ".join(parts)
-        group = self.group_tag()
-        return f"{base}-{group}" if group else base
+        return self._with_group(self.release_name_parts(release_id=self.id))
 
     def tv_folder(self) -> str:
-        parts = self.release_name_parts(season=self.season, release_id=self.id)
-        base = " ".join(parts)
-        group = self.group_tag()
-        return f"{base}-{group}" if group else base
+        return self._with_group(self.release_name_parts(season=self.season, release_id=self.id))
 
     def episode_filename(self, season: int, episode: int, ext: str) -> str:
-        parts = self.release_name_parts(season=season, episode=episode)
-        base = " ".join(parts)
-        group = self.group_tag()
-        return f"{base}-{group}{ext}" if group else base
+        return self._with_group(self.release_name_parts(season=season, episode=episode), ext)

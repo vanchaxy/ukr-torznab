@@ -1,10 +1,11 @@
+from dataclasses import dataclass
 from datetime import UTC
 from email.utils import format_datetime
 
 from fastapi.responses import Response
 from lxml import etree
 
-from ukr_torznab.api.caps import CAT_MOVIE, CAT_TV
+from ukr_torznab.api.caps import CAT_MOVIE, CAT_TV, DEFAULT_LIMIT, MAX_LIMIT
 from ukr_torznab.api.xml import _TORZNAB_NS, torznab_attr, xml_response
 from ukr_torznab.models import (
     CodecFamily,
@@ -17,11 +18,64 @@ from ukr_torznab.models import (
 from ukr_torznab.models.codec_family import CODEC_MAP
 
 
+SEARCH_FUNCTIONS = ("search", "tvsearch", "movie")
+
+
+@dataclass(frozen=True, slots=True)
+class SearchParams:
+    t: str
+    q: str | None
+    content_types: list[str] | None
+    imdb_id: int | None
+    tvdb_id: int | None
+    tmdb_id: int | None
+    season: int | None
+    episode: int | None
+    offset: int
+    limit: int
+    xseed: bool
+
+
+def search_params(
+    t: str = "search",
+    q: str | None = None,
+    cat: str | None = None,
+    imdbid: str | None = None,
+    tvdbid: str | None = None,
+    tmdbid: str | None = None,
+    season: int | None = None,
+    ep: int | None = None,
+    offset: int = 0,
+    limit: int = DEFAULT_LIMIT,
+    xseed: int = 0,
+) -> SearchParams:
+    """FastAPI dependency: parse and normalise the Torznab query string."""
+    return SearchParams(
+        t=t,
+        q=q,
+        content_types=content_type_filter(
+            cat,
+            force_tv=(t == "tvsearch"),
+            force_movie=(t == "movie"),
+        ),
+        imdb_id=parse_imdbid(imdbid),
+        tvdb_id=_parse_int_id(tvdbid),
+        tmdb_id=_parse_int_id(tmdbid),
+        season=season,
+        episode=ep,
+        offset=max(offset, 0),
+        limit=min(max(limit, 1), MAX_LIMIT),
+        xseed=bool(xseed),
+    )
+
+
 def _langs_str(langs: list[Lang]) -> str | None:
-    if not langs:
-        return None
-    names = [str(l) for l in langs if str(l)]
+    names = [str(lang) for lang in langs if str(lang)]
     return ", ".join(names) if names else None
+
+
+def _parse_int_id(raw: str | None) -> int | None:
+    return int(raw) if raw and raw.isdigit() else None
 
 
 def parse_imdbid(raw: str | None) -> int | None:

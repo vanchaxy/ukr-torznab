@@ -1,10 +1,10 @@
-import re
 from collections import Counter
 from pathlib import Path
 
 from openai import AsyncOpenAI
 
 from ukr_torznab.clients.llm import map_files_to_episodes
+from ukr_torznab.utils import positional_numbers, unique_numbers_by_pattern
 
 
 def match_episodes(
@@ -16,7 +16,8 @@ def match_episodes(
     if not season_episodes:
         return None
 
-    file_nums = _extract_sxxexx(video_files) or _extract_positional(video_files)
+    names = [str(f) for f in video_files]
+    file_nums = unique_numbers_by_pattern(r"s\d+e(\d+)", names) or positional_numbers(names)
     if file_nums is None:
         return None
 
@@ -114,30 +115,6 @@ def _get_season_episodes(skyhook: dict, season: int) -> list[dict]:
                 },
             )
     return episodes
-
-
-def _extract_sxxexx(files: list[Path]) -> dict[str, int] | None:
-    results: dict[str, int] = {}
-    for f in files:
-        matches = re.findall(r"s\d+e(\d+)", str(f), re.IGNORECASE)
-        if matches:
-            results[str(f)] = int(matches[0])
-    if len(results) == len(files) and len(set(results.values())) == len(files):
-        return results
-    return None
-
-
-def _extract_positional(files: list[Path]) -> dict[str, int] | None:
-    if len(files) <= 1:
-        return None
-    all_nums = [re.findall(r"\d+", str(f)) for f in files]
-    if len(set(len(nums) for nums in all_nums)) != 1:
-        return None
-    for col in range(len(all_nums[0])):
-        vals = [int(nums[col]) for nums in all_nums]
-        if len(set(vals)) == len(files):
-            return {str(f): int(nums[col]) for f, nums in zip(files, all_nums)}
-    return None
 
 
 def _numbers_match_season(
