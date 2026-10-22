@@ -65,12 +65,6 @@ class UtpClient:
         }
         if name:
             params["name"] = name
-        if imdb_id is not None:
-            params["imdbId"] = str(imdb_id)
-        if tvdb_id is not None:
-            params["tvdbId"] = str(tvdb_id)
-        if tmdb_id is not None:
-            params["tmdbId"] = str(tmdb_id)
         if season is not None:
             params["seasonNumber"] = str(season)
         if episode is not None:
@@ -79,6 +73,26 @@ class UtpClient:
             for i, cat_id in enumerate(categories):
                 params[f"categories[{i}]"] = str(cat_id)
 
+        # UTP ANDs id filters, and many torrents there lack a tvdb (or imdb) id. Sonarr sends
+        # tvdbid and imdbid together, so query each id on its own and merge the results.
+        id_filters = [
+            {key: str(value)}
+            for key, value in (("imdbId", imdb_id), ("tvdbId", tvdb_id), ("tmdbId", tmdb_id))
+            if value is not None
+        ] or [{}]
+
+        releases: dict[int, Release] = {}
+        for id_filter in id_filters:
+            for rel in await self._filter(params | id_filter):
+                releases.setdefault(rel.id, rel)
+        # The requested ids all point at the same title, so fill in the ones UTP is missing.
+        for rel in releases.values():
+            rel.imdb_id = rel.imdb_id or imdb_id
+            rel.tvdb_id = rel.tvdb_id or tvdb_id
+            rel.tmdb_id = rel.tmdb_id or tmdb_id
+        return list(releases.values())
+
+    async def _filter(self, params: dict[str, str]) -> list[Release]:
         try:
             resp = await self._client.get("/filter", params=params)
             resp.raise_for_status()

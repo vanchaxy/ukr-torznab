@@ -24,19 +24,30 @@ from ukr_torznab.tasks.scraper.parse_topics.mappings import (
 from ukr_torznab.utils import clean_string
 
 
+# x264/x265 traces in MediaInfo or encode logs mean the video was re-encoded.
+_ENCODER_RE = re.compile(r"\bx26[45]\b|encoding settings|бібліотека кодування")
+_MEDIAINFO_RE = re.compile(r"writing library|бібліотека запису|complete name|повна назва")
+
+
 def detect_quality(text: str, name: str) -> Quality:
     # 1) look in the "якість:" field first
+    field_q = None
     for match_str in re.findall(r"якість:(.+?)\n", text):
-        q = _match_quality_string(match_str)
-        if q is not None:
-            return q
+        field_q = _match_quality_string(match_str)
+        if field_q is not None:
+            break
 
     # 2) fall back to torrent name
-    q = _match_quality_string(name)
-    if q is not None:
-        return q
+    name_q = _match_quality_string(name)
 
-    return Quality.UNKNOWN
+    # Uploaders mix up WEB-DL and WEB-DLRip; let the MediaInfo encoder traces decide.
+    if {field_q, name_q} == {Quality.WEBDL, Quality.WEBRIP}:
+        if _ENCODER_RE.search(text):
+            return Quality.WEBRIP
+        if _MEDIAINFO_RE.search(text):
+            return Quality.WEBDL
+
+    return field_q or name_q or Quality.UNKNOWN
 
 
 def _match_quality_string(raw: str) -> Quality | None:
@@ -131,6 +142,7 @@ def detect_audio_sources(html_lower: str, text: str) -> set[AudioSource]:
         )
         + re.findall(r".*переклад:(.+)", text)
         + re.findall(r".*озвучення:(.+)", text)
+        + re.findall(r"запис звуку з[^:\n]*:(.+?)(?:\.\s|$)", text, re.MULTILINE)
     )
     for tag, source in AUDIO_SOURCE_TITLES_MAP:
         for row in title_rows:

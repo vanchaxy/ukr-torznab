@@ -177,6 +177,7 @@ STUDIO_MAP: list[tuple[str, AudioSource]] = sorted(
         ("vhsrecord", AudioSource.VHS_RECORD),
         ("cine+", AudioSource.VOLYA_CINE_PLUS),
         ("в одне рило", AudioSource.V_ODNE_RYLO),
+        ("yaniam", AudioSource.YANIAM),
         ("воднерило", AudioSource.V_ODNE_RYLO),
     ],
     key=lambda t: len(t[0]),

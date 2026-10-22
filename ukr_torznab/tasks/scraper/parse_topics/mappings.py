@@ -43,6 +43,8 @@ QUALITY_BY_VALUE: dict[str, Quality] = {
     "d-theater": Quality.RAW_HD,
     "filmscan": Quality.RAW_HD,
     # --- WEBRip ---
+    "web-dlrip": Quality.WEBRIP,
+    "web dlrip": Quality.WEBRIP,
     "wed-dlrip": Quality.WEBRIP,
     "webdlrip": Quality.WEBRIP,
     "web-drip": Quality.WEBRIP,
