@@ -74,6 +74,7 @@ A FastAPI app on port `8000` with one Torznab endpoint per tracker.
 - `GET /utp/api?...`: the same Torznab interface, backed by the utp.to API (requires `UTP_API_KEY`)
 - `GET /toloka/info/{topic_id}`: JSON parser state for one topic (`ok`, `skipped` with reason, `pending`, `not_downloaded`, `not_indexed`) and the parsed release
 - `GET /utp/info/{torrent_id}`: JSON parsed view of one UTP torrent, with per-audio-track detection and warnings (cached for 15 minutes)
+- `GET /stats`: parse-stats dashboard. Cross-filter toloka topics by posting year, category, parse result/skip reason, quality, resolution, codec, audio, subtitles, warnings and more (data from `GET /stats/data`, cached for 5 minutes)
 
 All search functions accept `cat`, `offset`, `limit` (max 100) and `xseed=1`. With `xseed=1` the release group suffix is dropped from titles, which helps cross-seed matching.
 
@@ -169,7 +170,7 @@ The included `docker-compose.yml` is a development stack:
 Docker Compose loads `.env` from the working directory. To use PostgreSQL, set
 `DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/toloka`.
 
-A production image is built by `.github/workflows/docker-build-push.yml` and pushed to `ghcr.io`. The version in `ukr_torznab/__init__.py` must be an `rc` version on branches and a non-`rc` version on `main`.
+A production image is built by `.github/workflows/docker-build-push.yml` and pushed to `ghcr.io/vanchaxy/ukr-torznab`. The version in `ukr_torznab/__init__.py` must be an `rc` version on branches and a non-`rc` version on `main`.
 
 ---
 
