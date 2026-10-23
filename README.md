@@ -116,7 +116,7 @@ Renames torrents downloaded by qBittorrent to the same scene-style names, then r
 
 Running the scraper needs toloka.to credentials and the IMDB dataset, and optionally OpenAI. Instead, one instance can run the scraper on PostgreSQL and publish the `topic` and `release` tables through [ElectricSQL](https://electric-sql.com/). Other instances replace the scraper tasks with `ElectricConsumerTask`, which streams those tables into their local database. Toloka credentials are still required so `/toloka/download` can fetch `.torrent` files.
 
-Consumer mode is the default: `ELECTRIC_URL` defaults to `https://electric.vnchx.com` and `DATABASE_URL` to a local SQLite file, so only `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` are needed:
+Consumer mode is the default: `ELECTRIC_URL` defaults to `https://electric.vnchx.com`, and the Docker image sets `DATABASE_URL` to SQLite at `/data/toloka.db`, so the container only needs `TOLOKA_USERNAME` and `TOLOKA_PASSWORD`:
 
 ```bash
 docker run -e TOLOKA_USERNAME=... -e TOLOKA_PASSWORD=... -v toloka_data:/data -p 8000:8000 ghcr.io/vanchaxy/ukr-torznab
@@ -143,7 +143,7 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | No | SQLAlchemy async URL, either `sqlite+aiosqlite:///toloka.db` or `postgresql+asyncpg://...` (default: `sqlite+aiosqlite:///toloka.db`; `/data/toloka.db` in the Docker image) |
+| `DATABASE_URL` | Yes | SQLAlchemy async URL, either `sqlite+aiosqlite:///toloka.db` or `postgresql+asyncpg://...`. The Docker image sets it to `sqlite+aiosqlite:////data/toloka.db`. |
 | `TOLOKA_USERNAME` | Yes | toloka.to login |
 | `TOLOKA_PASSWORD` | Yes | toloka.to password |
 | `API_PORT` | No | API port (default: `8000`) |
@@ -160,7 +160,7 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 | `QBITTORRENT_RENAME_TAG` | No | Tag added after a successful rename (default: `renamed`) |
 | `QBITTORRENT_RENAME_ERROR_TAG` | No | Tag added after a failed rename (default: `rename-error`) |
 
-`TOLOKA_USERNAME` and `TOLOKA_PASSWORD` have no defaults. The process fails on startup if either is missing.
+`DATABASE_URL`, `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` have no defaults (outside the Docker image for `DATABASE_URL`). The process fails on startup if any of them is missing.
 
 Database migrations run automatically on startup.
 
@@ -193,6 +193,7 @@ pip install -e ".[dev]"
 Run with SQLite (consumer mode by default; add `ELECTRIC_URL=` to run the scraper):
 
 ```bash
+export DATABASE_URL=sqlite+aiosqlite:///toloka.db
 export TOLOKA_USERNAME=your_username
 export TOLOKA_PASSWORD=your_password
 python -m ukr_torznab.main

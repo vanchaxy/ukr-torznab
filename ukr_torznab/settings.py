@@ -1,6 +1,6 @@
 import os
 
-DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite+aiosqlite:///toloka.db")
+DATABASE_URL: str = os.environ["DATABASE_URL"]
 ALEMBIC_DATABASE_URL: str = DATABASE_URL.replace("+aiosqlite", "").replace("+asyncpg", "")
 
 OPENAI_API_KEY: str | None = os.environ.get("OPENAI_API_KEY")

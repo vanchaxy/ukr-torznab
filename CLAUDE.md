@@ -17,9 +17,8 @@ docker compose up                       # dev stack: postgres, electric, sonarr,
 ```
 
 There is no test suite. Verify changes against a local SQLite DB (see "Verifying changes").
-`settings.py` reads `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` at import time, so set dummy values for any script
-that imports the package. `DATABASE_URL` defaults to `sqlite+aiosqlite:///toloka.db` and `ELECTRIC_URL` to
-`https://electric.vnchx.com` (consumer mode).
+`settings.py` reads `DATABASE_URL`, `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` at import time, so set dummy values
+for any script that imports the package. `ELECTRIC_URL` defaults to `https://electric.vnchx.com` (consumer mode).
 
 ## Layout
 
