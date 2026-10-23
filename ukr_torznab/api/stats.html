@@ -184,6 +184,8 @@ tbody tr.sel { background: var(--wash); font-weight: 600; }
   <div id="status">Loading…</div>
   <div id="app" hidden>
     <div class="toolbar">
+      <select id="pick-year" aria-label="Posting year"></select>
+      <select id="pick-category" aria-label="Category" style="max-width:100%"></select>
       <input type="search" id="search" placeholder="Filter by topic name…" aria-label="Filter by topic name">
       <span class="chips" id="chips"></span>
       <button id="clear" hidden>Clear filters</button>
@@ -710,8 +712,34 @@ function downloadCsv() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Dropdowns for the two main dimensions. They pick one value; charts can still add more.
+const PICKERS = [["pick-year", "year", "All years", "years"], ["pick-category", "category", "All categories", "categories"]];
+
+function setupPickers() {
+  for (const [id, key, allLabel] of PICKERS) {
+    const sel = document.getElementById(id);
+    const vals = DIM[key].values.map((v, i) => [v, i]);
+    vals.sort(key === "year" ? (a, b) => b[0] - a[0] : (a, b) => a[0].localeCompare(b[0], "uk"));
+    sel.append(el("option", { value: "" }, allLabel), ...vals.map(([v, i]) => el("option", { value: String(i) }, v)));
+    sel.addEventListener("change", () => {
+      if (sel.value === "") filters.delete(key);
+      else filters.set(key, new Set([Number(sel.value)]));
+      update();
+    });
+  }
+}
+
+function syncPickers() {
+  for (const [id, key, allLabel, plural] of PICKERS) {
+    const sel = document.getElementById(id), set = filters.get(key);
+    sel.options[0].textContent = set && set.size > 1 ? `${set.size} ${plural} selected` : allLabel;
+    sel.value = set && set.size === 1 ? String([...set][0]) : "";
+  }
+}
+
 function update() {
   const { matched, rowsFor } = computeSets();
+  syncPickers();
   renderChips();
   renderKpis(matched);
   renderYears(rowsFor("year"));
@@ -744,6 +772,7 @@ async function boot() {
   document.getElementById("meta").textContent =
     `${n(N)} toloka topics · parser v${D.parser_version} · data from ${new Date(D.generated_at).toLocaleString()}`;
 
+  setupPickers();
   const trendSel = document.getElementById("trend-dim");
   for (const d of D.dims) if (d.key !== "year") trendSel.append(el("option", { value: d.key }, d.label));
   trendSel.addEventListener("change", () => { trendDim = trendSel.value; update(); });
