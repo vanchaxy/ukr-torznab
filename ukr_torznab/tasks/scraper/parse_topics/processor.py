@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import cast
 
 import html2text
-import libtorrent as lt  # type: ignore[import-untyped]
+import libtorrent as lt
 from lxml import etree
 from lxml.etree import _Element, tostring
 from openai import AsyncOpenAI
@@ -92,10 +92,10 @@ async def process_single_page(
     # 2. Parse torrent metadata
     try:
         metadata = lt.bdecode(page.torrent)
-    except Exception:
+    except Exception:  # noqa: BLE001 - libtorrent raises bare RuntimeError on bad bencode
         return SkippedPage(pid, SkipReason.INVALID_TORRENT)
 
-    ti = lt.torrent_info(metadata)
+    ti = lt.torrent_info(cast("lt.TorrentFileDict", metadata))
     torrent_size = ti.total_size()
     infohash_sha256 = hashlib.sha256(bytes.fromhex(str(ti.info_hash()))).hexdigest()
     ti_files = ti.files()

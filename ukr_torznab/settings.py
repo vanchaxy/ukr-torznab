@@ -7,7 +7,8 @@ OPENAI_API_KEY: str | None = os.environ.get("OPENAI_API_KEY")
 
 UTP_API_KEY: str | None = os.environ.get("UTP_API_KEY")
 
-ELECTRIC_URL: str | None = os.environ.get("ELECTRIC_URL")
+# Consumer mode by default; set ELECTRIC_URL to an empty string to run the scraper instead.
+ELECTRIC_URL: str = os.environ.get("ELECTRIC_URL", "https://electric.vnchx.com")
 
 API_PORT: int = int(os.environ.get("API_PORT", "8000"))
 

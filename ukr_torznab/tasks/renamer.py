@@ -197,7 +197,9 @@ class RenameTorrentsTask(AbstractTask):
             if not any(f.get("name", "").startswith(prefix) for f in files):
                 return
             await asyncio.sleep(1)
-        raise TimeoutError(f"folder rename did not complete in 60 s: still has files under {old_folder!r}")
+        raise TimeoutError(
+            f"folder rename did not complete in 60 s: still has files under {old_folder!r}"
+        )
 
     async def _rename_bare_file(
         self,

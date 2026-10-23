@@ -155,7 +155,7 @@ class TolokaClient:
             )
             if len(dom_list) != 1:
                 return None
-        except Exception:
+        except Exception:  # noqa: BLE001 - any parse failure means not a topic page
             return None
         return response.text
 
