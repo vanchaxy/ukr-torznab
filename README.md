@@ -170,7 +170,7 @@ The included `docker-compose.yml` is a development stack:
 Docker Compose loads `.env` from the working directory. To use PostgreSQL, set
 `DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/toloka`.
 
-A production image is built by `.github/workflows/docker-build-push.yml` and pushed to `ghcr.io`. The version in `ukr_torznab/__init__.py` must be an `rc` version on branches and a non-`rc` version on `main`.
+A production image is built by `.github/workflows/docker-build-push.yml` and pushed to `ghcr.io/vanchaxy/ukr-torznab`. The version in `ukr_torznab/__init__.py` must be an `rc` version on branches and a non-`rc` version on `main`.
 
 ---
 
