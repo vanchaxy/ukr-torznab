@@ -56,7 +56,14 @@ def _category_name(category: str) -> str:
     return TOLOKA_CATEGORY_NAMES.get(cat_id, category)
 
 
+def _removed(row) -> bool:
+    # Gone from toloka's listings with no HTML to (re)parse, so nothing will ever process it.
+    return not row.observed and not row.has_html
+
+
 def _state(row) -> str:
+    if _removed(row):
+        return "removed"
     if row.release_id is None:
         return "pending" if row.downloaded else "not downloaded"
     return "ok" if row.result == "ok" else row.result
@@ -78,7 +85,7 @@ def _row_values(row) -> dict[str, Any]:
         "parser": None
         if row.parser_version is None
         else f"v{row.parser_version}"
-        + ("" if row.parser_version >= PARSER_VERSION else " (stale)"),
+        + ("" if row.parser_version >= PARSER_VERSION or _removed(row) else " (stale)"),
     }
     if row.result != "ok":
         return values
