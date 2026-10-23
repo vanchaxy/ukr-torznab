@@ -12,12 +12,14 @@ ruff format ukr_torznab                 # format, line length 100
 mypy ukr_torznab                        # should report no errors
 DATABASE_URL=sqlite+aiosqlite:///toloka.db TOLOKA_USERNAME=... TOLOKA_PASSWORD=... \
   python -m ukr_torznab.main            # run; applies Alembic migrations on start
+                                        # consumer mode by default; ELECTRIC_URL= runs the scraper
 docker compose up                       # dev stack: postgres, electric, sonarr, prowlarr
 ```
 
 There is no test suite. Verify changes against a local SQLite DB (see "Verifying changes").
-`settings.py` reads `DATABASE_URL`, `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` at import time, so set dummy values
-for any script that imports the package.
+`settings.py` reads `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` at import time, so set dummy values for any script
+that imports the package. `DATABASE_URL` defaults to `sqlite+aiosqlite:///toloka.db` and `ELECTRIC_URL` to
+`https://electric.vnchx.com` (consumer mode).
 
 ## Layout
 

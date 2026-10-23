@@ -112,9 +112,17 @@ Renames torrents downloaded by qBittorrent to the same scene-style names, then r
 - **TV episodes:** each mapped file becomes `<episode release name>.<ext>`, and the folder becomes `<season release name> [<id>]-group`. Files missing from the episode map (extras, samples) are left untouched.
 - **Movies:** the file gets the full release name, and the folder (if any) gets the release name with `[<id>]`.
 
-### 4. ElectricSQL consumer mode (optional)
+### 4. ElectricSQL consumer mode (default)
 
-Running the scraper needs toloka.to credentials and the IMDB dataset, and optionally OpenAI. Instead, one instance can run the scraper on PostgreSQL and publish the `topic` and `release` tables through [ElectricSQL](https://electric-sql.com/). Other instances set `ELECTRIC_URL` and replace the scraper tasks with `ElectricConsumerTask`, which streams those tables into their local database. Toloka credentials are still required so `/toloka/download` can fetch `.torrent` files.
+Running the scraper needs toloka.to credentials and the IMDB dataset, and optionally OpenAI. Instead, one instance can run the scraper on PostgreSQL and publish the `topic` and `release` tables through [ElectricSQL](https://electric-sql.com/). Other instances replace the scraper tasks with `ElectricConsumerTask`, which streams those tables into their local database. Toloka credentials are still required so `/toloka/download` can fetch `.torrent` files.
+
+Consumer mode is the default: `ELECTRIC_URL` defaults to `https://electric.vnchx.com` and `DATABASE_URL` to a local SQLite file, so only `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` are needed:
+
+```bash
+docker run -e TOLOKA_USERNAME=... -e TOLOKA_PASSWORD=... -v toloka_data:/data -p 8000:8000 ghcr.io/vanchaxy/ukr-torznab
+```
+
+To run the scraper yourself, set `ELECTRIC_URL=` (empty).
 
 On the publishing side, set `CREATE_ELECTRIC_PUBLICATION=1` and `ELECTRIC_USER_PASSWORD` before the first migration. This creates the `electric_user` role and the publication.
 
@@ -135,14 +143,14 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | SQLAlchemy async URL, either `sqlite+aiosqlite:///toloka.db` or `postgresql+asyncpg://...` |
+| `DATABASE_URL` | No | SQLAlchemy async URL, either `sqlite+aiosqlite:///toloka.db` or `postgresql+asyncpg://...` (default: `sqlite+aiosqlite:///toloka.db`; `/data/toloka.db` in the Docker image) |
 | `TOLOKA_USERNAME` | Yes | toloka.to login |
 | `TOLOKA_PASSWORD` | Yes | toloka.to password |
 | `API_PORT` | No | API port (default: `8000`) |
 | `LOG_LEVEL` | No | Logging level (default: `INFO`) |
 | `OPENAI_API_KEY` | No | Enables the LLM fallback for file → episode mapping |
 | `UTP_API_KEY` | No | Enables the `/utp/api` proxy and renaming of UTP torrents |
-| `ELECTRIC_URL` | No | ElectricSQL endpoint. Switches to consumer mode. |
+| `ELECTRIC_URL` | No | ElectricSQL endpoint for consumer mode (default: `https://electric.vnchx.com`). Set it empty to run the scraper. |
 | `CREATE_ELECTRIC_PUBLICATION` | No | PostgreSQL only. Creates the Electric role and publication during migration. |
 | `ELECTRIC_USER_PASSWORD` | With the above | Password for `electric_user` |
 | `QBITTORRENT_URL` | No | qBittorrent Web UI URL. Enables the renamer. |
@@ -152,7 +160,7 @@ All configuration comes from environment variables. Copy `.env.example` to `.env
 | `QBITTORRENT_RENAME_TAG` | No | Tag added after a successful rename (default: `renamed`) |
 | `QBITTORRENT_RENAME_ERROR_TAG` | No | Tag added after a failed rename (default: `rename-error`) |
 
-`DATABASE_URL`, `TOLOKA_USERNAME` and `TOLOKA_PASSWORD` have no defaults. The process fails on startup if any of them is missing.
+`TOLOKA_USERNAME` and `TOLOKA_PASSWORD` have no defaults. The process fails on startup if either is missing.
 
 Database migrations run automatically on startup.
 
@@ -182,10 +190,9 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-Run with SQLite:
+Run with SQLite (consumer mode by default; add `ELECTRIC_URL=` to run the scraper):
 
 ```bash
-export DATABASE_URL=sqlite+aiosqlite:///toloka.db
 export TOLOKA_USERNAME=your_username
 export TOLOKA_PASSWORD=your_password
 python -m ukr_torznab.main
