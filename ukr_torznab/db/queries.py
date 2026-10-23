@@ -308,6 +308,25 @@ async def get_topic_info(conn: AsyncConnection, topic_id: int):
     return (await conn.execute(query)).first()
 
 
+async def get_stats_rows(conn: AsyncConnection):
+    """Every topic with its release row (if any), for the /stats dashboard."""
+    query = (
+        select(
+            *_RELEASE_COLUMNS,
+            topic.c.category,
+            topic.c.added_on,
+            page.c.id.is_not(None).label("downloaded"),
+            release.c.id.label("release_id"),
+            release.c.result,
+            release.c.parser_version,
+        )
+        .outerjoin(page, topic.c.id == page.c.id)
+        .outerjoin(release, topic.c.id == release.c.id)
+        .order_by(topic.c.id.desc())
+    )
+    return (await conn.execute(query)).all()
+
+
 async def get_releases_by_infohash(
     conn: AsyncConnection,
     infohashes: list[str],

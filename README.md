@@ -74,6 +74,7 @@ A FastAPI app on port `8000` with one Torznab endpoint per tracker.
 - `GET /utp/api?...`: the same Torznab interface, backed by the utp.to API (requires `UTP_API_KEY`)
 - `GET /toloka/info/{topic_id}`: JSON parser state for one topic (`ok`, `skipped` with reason, `pending`, `not_downloaded`, `not_indexed`) and the parsed release
 - `GET /utp/info/{torrent_id}`: JSON parsed view of one UTP torrent, with per-audio-track detection and warnings (cached for 15 minutes)
+- `GET /stats`: parse-stats dashboard. Cross-filter toloka topics by posting year, category, parse result/skip reason, quality, resolution, codec, audio, subtitles, warnings and more (data from `GET /stats/data`, cached for 5 minutes)
 
 All search functions accept `cat`, `offset`, `limit` (max 100) and `xseed=1`. With `xseed=1` the release group suffix is dropped from titles, which helps cross-seed matching.
 

@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parse stats</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --ring: rgba(11, 11, 11, 0.10);
+  --wash: rgba(11, 11, 11, 0.05);
+  --ok: #2a78d6;
+  --skip: #eb6834;
+  --pending: #b5b3ab;
+  --bar: #2a78d6;
+  --link: #1c5cab;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --ring: rgba(255, 255, 255, 0.10);
+    --wash: rgba(255, 255, 255, 0.06);
+    --ok: #3987e5;
+    --skip: #d95926;
+    --pending: #5d5c57;
+    --bar: #3987e5;
+    --link: #86b6ef;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --ring: rgba(255, 255, 255, 0.10);
+  --wash: rgba(255, 255, 255, 0.06);
+  --ok: #3987e5;
+  --skip: #d95926;
+  --pending: #5d5c57;
+  --bar: #3987e5;
+  --link: #86b6ef;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+a { color: var(--link); }
+.sub { color: var(--ink-2); margin-top: 4px; }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 0;
+}
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
+.toolbar input[type="search"] {
+  flex: 1 1 240px;
+  max-width: 360px;
+  padding: 6px 10px;
+  border: 1px solid var(--ring);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+button, select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--ring);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+button:hover { background: var(--wash); }
+.chip { display: inline-flex; gap: 6px; align-items: center; border-radius: 999px; padding: 3px 10px; }
+.chip b { font-weight: 600; }
+.chips { display: contents; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi .label { color: var(--ink-2); font-size: 13px; }
+.kpi .value { font-size: 26px; font-weight: 600; margin-top: 2px; }
+.kpi .note { color: var(--muted); font-size: 12px; }
+.row2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-bottom: 16px; }
+.head { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.head h2 { margin: 0; }
+.seg { display: inline-flex; border: 1px solid var(--ring); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; }
+.seg button[aria-pressed="true"] { background: var(--wash); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--ink-2); font-size: 13px; }
+.legend span::before {
+  content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  margin-right: 6px; vertical-align: -1px; background: var(--c);
+}
+svg text { fill: var(--muted); font-size: 11px; }
+.chart-wrap { width: 100%; overflow: hidden; }
+.yr-col { cursor: pointer; }
+.yr-col .hit { fill: transparent; }
+.yr-col:hover .hit, .yr-col:focus .hit { fill: var(--wash); }
+.yr-col.dim rect, .yr-col.dim path { opacity: 0.3; }
+.yr-col:focus { outline: none; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { color: var(--ink-2); font-weight: 600; font-size: 13px; cursor: pointer; user-select: none; }
+td.r, th.r { text-align: right; }
+tbody tr.click { cursor: pointer; }
+tbody tr.click:hover { background: var(--wash); }
+tbody tr.sel { background: var(--wash); font-weight: 600; }
+.mini { display: flex; gap: 2px; width: 140px; height: 10px; }
+.mini i { display: block; height: 100%; border-radius: 2px; background: var(--c); }
+.facets { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.facet h2 { display: flex; justify-content: space-between; gap: 8px; }
+.facet h2 small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.fbar {
+  display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+  width: 100%; text-align: left; border: 0; background: none; padding: 3px 4px; border-radius: 4px;
+}
+.fbar .name { position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 0 6px; }
+.fbar .name::after {
+  content: ""; position: absolute; left: 0; bottom: 0; height: 4px; border-radius: 2px;
+  width: var(--w); background: var(--bar);
+}
+.fbar .check { color: var(--ink); font-weight: 700; }
+.fbar .pct { color: var(--ink-2); min-width: 44px; text-align: right; }
+.fbar .cnt { color: var(--muted); min-width: 56px; text-align: right; }
+.facet.filtered .fbar:not(.sel) .name::after { opacity: 0.35; }
+.fbar.sel .name { font-weight: 600; }
+.more { margin-top: 6px; font-size: 13px; padding: 3px 8px; }
+.heat td { padding: 0; border: 0; }
+.heat td.cell {
+  height: 26px; min-width: 36px; text-align: center; font-size: 11px; border: 1px solid var(--surface);
+  border-radius: 3px;
+}
+.heat th { font-weight: 400; color: var(--muted); font-size: 11px; padding: 2px 4px; border: 0; cursor: default; }
+.heat th.rowh { color: var(--ink-2); font-size: 13px; text-align: right; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+#tip {
+  position: fixed; pointer-events: none; z-index: 10; display: none;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--ring);
+  border-radius: 8px; padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  max-width: 320px;
+}
+#tip .t { font-weight: 600; margin-bottom: 4px; }
+#tip .l { display: flex; gap: 8px; justify-content: space-between; }
+#tip .l span:first-child { color: var(--ink-2); }
+#tip .k { display: inline-block; width: 12px; height: 2px; margin-right: 6px; vertical-align: 3px; background: var(--c); }
+#status { padding: 48px 0; text-align: center; color: var(--ink-2); }
+@media (max-width: 600px) {
+  .facets { grid-template-columns: minmax(0, 1fr); }
+  .kpi .value { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Parse stats</h1>
+  <div class="sub" id="meta">toloka topics by posting year, category and parser output</div>
+  <div id="status">Loading…</div>
+  <div id="app" hidden>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Filter by topic name…" aria-label="Filter by topic name">
+      <span class="chips" id="chips"></span>
+      <button id="clear" hidden>Clear filters</button>
+      <span style="flex:1"></span>
+      <button id="csv">Download CSV</button>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="row2">
+      <section class="card">
+        <div class="head">
+          <h2>Parse result by posting year</h2>
+          <div class="seg" id="yr-mode">
+            <button data-mode="count" aria-pressed="true">Count</button>
+            <button data-mode="share" aria-pressed="false">Share</button>
+          </div>
+        </div>
+        <div class="legend">
+          <span style="--c: var(--ok)">Parsed</span>
+          <span style="--c: var(--skip)">Skipped</span>
+          <span style="--c: var(--pending)">Pending / not downloaded</span>
+        </div>
+        <div class="chart-wrap" id="years"></div>
+      </section>
+      <section class="card">
+        <div class="head">
+          <h2>Value share by posting year</h2>
+          <label class="muted">Dimension <select id="trend-dim"></select></label>
+        </div>
+        <div class="muted" style="font-size:12px;margin-bottom:8px">
+          Share of each year's topics that have this value (top 10 values; multi-valued fields can add up to more than 100%).
+        </div>
+        <div class="tablewrap" id="trend"></div>
+      </section>
+      <section class="card">
+        <div class="head"><h2>Categories</h2><span class="muted">Click a row to filter</span></div>
+        <div class="tablewrap" id="cats"></div>
+      </section>
+    </div>
+    <div class="facets" id="facets"></div>
+    <section class="card">
+      <div class="head"><h2 id="list-title">Topics</h2></div>
+      <div class="tablewrap" id="list"></div>
+    </section>
+  </div>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>
+"use strict";
+
+const LIST_LIMIT = 200;
+const FACET_TOP = 8;
+const FACET_MAX = 100;
+const TREND_TOP = 10;
+const OWN_CHART_DIMS = new Set(["year", "category"]);
+const PENDING_STATES = new Set(["pending", "not downloaded"]);
+// Sequential blue, light -> dark.
+const RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5",
+              "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"];
+
+let D, N, DIM, names, namesLower, ALL_YEARS;
+const filters = new Map(); // dim key -> Set of value indexes (OR within a dim, AND across dims)
+let search = "";
+let yearMode = "count";
+let trendDim = "quality";
+let catSort = { key: "total", dir: -1 };
+const expanded = new Set();
+
+// ---------- helpers ----------
+
+function el(tag, props, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "style") node.style.cssText = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else if (k in node && k !== "list") node[k] = v;
+    else node.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null || c === false) continue;
+    node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return node;
+}
+
+function svg(tag, attrs) {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) node.setAttribute(k, v);
+  return node;
+}
+
+const fmt = new Intl.NumberFormat("en-US");
+const n = (x) => fmt.format(x);
+const pct = (x, total) => (total ? (100 * x / total) : 0).toFixed(total && x / total < 0.1 && x ? 1 : 0) + "%";
+
+function prettyState(s) {
+  if (s === "ok" || PENDING_STATES.has(s)) return s === "ok" ? "Parsed" : s[0].toUpperCase() + s.slice(1);
+  const words = s.toLowerCase().split("_").map((w) =>
+    ({ imdb: "IMDb", tv: "TV", skyhook: "Skyhook", servarr: "Servarr" })[w] || w);
+  const out = words.join(" ");
+  return out[0].toUpperCase() + out.slice(1);
+}
+
+function label(key, value) {
+  return key === "state" ? prettyState(value) : value;
+}
+
+function outcome(stateValue) {
+  if (stateValue === "ok") return "ok";
+  return PENDING_STATES.has(stateValue) ? "pending" : "skip";
+}
+
+// ---------- tooltip ----------
+
+const tip = document.getElementById("tip");
+function showTip(ev, title, lines) {
+  tip.replaceChildren(el("div", { className: "t" }, title));
+  for (const [name, value, color] of lines) {
+    tip.append(el("div", { className: "l" },
+      el("span", {}, color ? el("i", { className: "k", style: `--c:${color}` }) : null, name),
+      el("b", { className: "num" }, value)));
+  }
+  tip.style.display = "block";
+  moveTip(ev);
+}
+function moveTip(ev) {
+  const r = tip.getBoundingClientRect();
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top = Math.max(8, y) + "px";
+}
+function hideTip() { tip.style.display = "none"; }
+
+// ---------- filtering ----------
+
+function passes(key, i) {
+  const v = D.columns[key][i];
+  if (v == null) return false;
+  const set = filters.get(key);
+  if (DIM[key].multi) return v.some((x) => set.has(x));
+  return set.has(v);
+}
+
+// Cross-filter: each chart sees every filter except its own dimension's.
+function computeSets() {
+  const keys = [...filters.keys()];
+  const matched = [];
+  const partial = Object.fromEntries(keys.map((k) => [k, []]));
+  for (let i = 0; i < N; i++) {
+    if (search && !namesLower[i].includes(search)) continue;
+    let fails = 0, failKey = null;
+    for (const k of keys) {
+      if (!passes(k, i)) { fails++; failKey = k; if (fails > 1) break; }
+    }
+    if (fails === 0) matched.push(i);
+    else if (fails === 1) partial[failKey].push(i);
+  }
+  const rowsFor = (key) => (partial[key] ? matched.concat(partial[key]) : matched);
+  return { matched, rowsFor };
+}
+
+function toggle(key, idx) {
+  let set = filters.get(key);
+  if (!set) filters.set(key, set = new Set());
+  if (set.has(idx)) set.delete(idx); else set.add(idx);
+  if (!set.size) filters.delete(key);
+  update();
+}
+
+// ---------- URL hash ----------
+
+function writeHash() {
+  const parts = [];
+  for (const [k, set] of filters) {
+    const vals = [...set].map((i) => encodeURIComponent(DIM[k].values[i]));
+    parts.push(`f.${k}=${vals.join(",")}`);
+  }
+  if (search) parts.push("q=" + encodeURIComponent(search));
+  if (trendDim !== "quality") parts.push("trend=" + trendDim);
+  if (yearMode !== "count") parts.push("mode=" + yearMode);
+  const h = parts.join("&");
+  if (location.hash.slice(1) !== h) history.replaceState(null, "", h ? "#" + h : location.pathname);
+}
+
+function readHash() {
+  filters.clear();
+  search = ""; trendDim = "quality"; yearMode = "count";
+  for (const part of location.hash.slice(1).split("&")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    const k = part.slice(0, eq), v = part.slice(eq + 1);
+    if (k.startsWith("f.") && DIM[k.slice(2)]) {
+      const dim = DIM[k.slice(2)];
+      const set = new Set(v.split(",").map((x) => dim.values.indexOf(decodeURIComponent(x))).filter((i) => i >= 0));
+      if (set.size) filters.set(dim.key, set);
+    } else if (k === "q") search = decodeURIComponent(v).toLowerCase();
+    else if (k === "trend" && DIM[v]) trendDim = v;
+    else if (k === "mode" && (v === "count" || v === "share")) yearMode = v;
+  }
+  document.getElementById("search").value = search;
+  document.getElementById("trend-dim").value = trendDim;
+  for (const b of document.querySelectorAll("#yr-mode button")) b.setAttribute("aria-pressed", b.dataset.mode === yearMode);
+}
+
+// ---------- renderers ----------
+
+function renderChips() {
+  const box = document.getElementById("chips");
+  box.replaceChildren();
+  for (const [k, set] of filters) {
+    const vals = [...set].map((i) => label(k, DIM[k].values[i])).join(" or ");
+    box.append(el("button", { className: "chip", title: "Remove filter", onclick: () => { filters.delete(k); update(); } },
+      el("span", {}, DIM[k].label + ":"), el("b", {}, vals), "✕"));
+  }
+  document.getElementById("clear").hidden = !filters.size && !search;
+}
+
+function renderKpis(rows) {
+  const st = D.columns.state, pv = D.columns.parser;
+  const stale = DIM.parser.values.map((v) => v.includes("stale"));
+  let ok = 0, skip = 0, pending = 0, staleN = 0;
+  for (const i of rows) {
+    const o = outcome(DIM.state.values[st[i]]);
+    if (o === "ok") ok++; else if (o === "skip") skip++; else pending++;
+    if (pv[i] != null && stale[pv[i]]) staleN++;
+  }
+  const parsed = ok + skip;
+  const tiles = [
+    ["Topics", n(rows.length), filters.size || search ? `of ${n(N)} total` : "all tracked categories"],
+    ["Parsed", n(ok), pct(ok, parsed) + " of processed"],
+    ["Skipped", n(skip), pct(skip, parsed) + " of processed"],
+    ["Pending", n(pending), "no release row yet"],
+    ["Stale parser", n(staleN), `older than v${D.parser_version}`],
+  ];
+  document.getElementById("kpis").replaceChildren(...tiles.map(([l, v, note]) =>
+    el("div", { className: "card kpi" }, el("div", { className: "label" }, l),
+      el("div", { className: "value" }, v), el("div", { className: "note" }, note))));
+}
+
+function renderYears(rows) {
+  const yv = DIM.year.values, st = D.columns.state, yc = D.columns.year;
+  const years = new Map();
+  for (const i of rows) {
+    const y = yv[yc[i]];
+    let b = years.get(y);
+    if (!b) years.set(y, b = { ok: 0, skip: 0, pending: 0, reasons: new Map() });
+    const s = DIM.state.values[st[i]];
+    const o = outcome(s);
+    b[o]++;
+    if (o === "skip") b.reasons.set(s, (b.reasons.get(s) || 0) + 1);
+  }
+  const box = document.getElementById("years");
+  box.replaceChildren();
+  if (!years.size) { box.append(el("div", { className: "muted" }, "No topics match.")); return; }
+
+  // Keep empty years on the axis so the timeline doesn't close up gaps.
+  const keys = ALL_YEARS;
+  for (const y of keys) if (!years.has(y)) years.set(y, { ok: 0, skip: 0, pending: 0, reasons: new Map() });
+  const W = Math.max(box.clientWidth || 900, 320), H = 240, padL = 44, padB = 22, padT = 10;
+  const plotW = W - padL - 4, plotH = H - padB - padT;
+  const totals = keys.map((y) => { const b = years.get(y); return b.ok + b.skip + b.pending; });
+  const max = yearMode === "share" ? 1 : Math.max(...totals);
+  const step = niceStep(max, 4);
+  const top = yearMode === "share" ? 1 : Math.ceil(max / step) * step;
+  const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", height: H, role: "img",
+                         "aria-label": "Stacked bars of parse results per posting year" });
+  for (let t = 0; t <= top + 1e-9; t += yearMode === "share" ? 0.25 : step) {
+    const y = padT + plotH - (t / top) * plotH;
+    s.append(svg("line", { x1: padL, x2: W - 4, y1: y, y2: y, stroke: t ? "var(--grid)" : "var(--axis)" }));
+    const tx = svg("text", { x: padL - 6, y: y + 4, "text-anchor": "end", class: "num" });
+    tx.textContent = yearMode === "share" ? Math.round(t * 100) + "%" : compact(t);
+    s.append(tx);
+  }
+  const slot = plotW / keys.length;
+  const bw = Math.max(4, Math.min(36, slot * 0.7));
+  const selYears = filters.get("year");
+  const labelEvery = Math.ceil(28 / slot);
+  keys.forEach((y, k) => {
+    const b = years.get(y), total = totals[k];
+    const scale = yearMode === "share" ? 1 / (total || 1) : 1;
+    const x = padL + slot * k + (slot - bw) / 2;
+    const g = svg("g", { class: "yr-col", tabindex: 0, role: "button", "aria-label": `${y}: ${total} topics` });
+    if (selYears && !selYears.has(yv.indexOf(y))) g.classList.add("dim");
+    g.append(svg("rect", { class: "hit", x: padL + slot * k, y: padT, width: slot, height: plotH }));
+    let base = padT + plotH;
+    const segs = [["ok", "var(--ok)"], ["skip", "var(--skip)"], ["pending", "var(--pending)"]].filter(([key]) => b[key]);
+    segs.forEach(([key, color], j) => {
+      const h = (b[key] * scale / top) * plotH;
+      const isTop = j === segs.length - 1;
+      const gap = j > 0 ? 2 : 0;
+      const hh = Math.max(0, h - gap);
+      base -= h;
+      if (hh <= 0) return;
+      if (isTop && hh > 4) {
+        const r = Math.min(4, bw / 2), y0 = base, y1 = base + hh;
+        g.append(svg("path", { fill: color, d:
+          `M${x},${y1}V${y0 + r}Q${x},${y0} ${x + r},${y0}H${x + bw - r}Q${x + bw},${y0} ${x + bw},${y0 + r}V${y1}Z` }));
+      } else {
+        g.append(svg("rect", { fill: color, x, y: base, width: bw, height: hh }));
+      }
+    });
+    if (k % labelEvery === 0 || k === keys.length - 1) {
+      const tx = svg("text", { x: x + bw / 2, y: H - 6, "text-anchor": "middle", class: "num" });
+      tx.textContent = labelEvery > 1 ? "'" + y.slice(2) : y;
+      g.append(tx);
+    }
+    const tipLines = () => {
+      const lines = [
+        ["Parsed", `${n(b.ok)} · ${pct(b.ok, total)}`, "var(--ok)"],
+        ["Skipped", `${n(b.skip)} · ${pct(b.skip, total)}`, "var(--skip)"],
+        ["Pending", `${n(b.pending)} · ${pct(b.pending, total)}`, "var(--pending)"],
+      ];
+      for (const [r, c] of [...b.reasons].sort((a, b2) => b2[1] - a[1]).slice(0, 5)) {
+        lines.push(["  " + prettyState(r), n(c)]);
+      }
+      return lines;
+    };
+    g.addEventListener("pointermove", (ev) => showTip(ev, `${y} · ${n(total)} topics`, tipLines()));
+    g.addEventListener("pointerleave", hideTip);
+    g.addEventListener("focus", () => {
+      const r = g.getBoundingClientRect();
+      showTip({ clientX: r.right, clientY: r.top }, `${y} · ${n(total)} topics`, tipLines());
+    });
+    g.addEventListener("blur", hideTip);
+    // A year can be on the axis without any topics in the whole dataset.
+    const pick = () => { if (yv.includes(y)) toggle("year", yv.indexOf(y)); };
+    g.addEventListener("click", () => { hideTip(); pick(); });
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); pick(); } });
+    s.append(g);
+  });
+  box.append(s);
+}
+
+function niceStep(max, ticks) {
+  const raw = max / ticks || 1;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 2.5, 5, 10].map((m) => m * mag).find((m) => m >= raw);
+}
+function compact(x) {
+  return x >= 1000 ? (x / 1000).toFixed(x % 1000 ? 1 : 0) + "k" : String(x);
+}
+
+function renderTrend(rows) {
+  const key = trendDim, dim = DIM[key], col = D.columns[key];
+  const yv = DIM.year.values, yc = D.columns.year;
+  const perYear = new Map(); // year -> {total, counts: Map}
+  const overall = new Map();
+  for (const i of rows) {
+    const v = col[i];
+    if (v == null) continue;
+    const y = yv[yc[i]];
+    let b = perYear.get(y);
+    if (!b) perYear.set(y, b = { total: 0, counts: new Map() });
+    b.total++;
+    for (const x of dim.multi ? v : [v]) {
+      b.counts.set(x, (b.counts.get(x) || 0) + 1);
+      overall.set(x, (overall.get(x) || 0) + 1);
+    }
+  }
+  const box = document.getElementById("trend");
+  box.replaceChildren();
+  const years = ALL_YEARS.filter((y) => perYear.has(y));
+  if (!years.length) { box.append(el("div", { className: "muted" }, "No topics with this field match.")); return; }
+  const top = [...overall].sort((a, b) => b[1] - a[1]).slice(0, TREND_TOP).map(([x]) => x);
+  const dark = getComputedStyle(document.documentElement).colorScheme === "dark";
+  const table = el("table", { className: "heat" });
+  table.append(el("thead", {}, el("tr", {}, el("th", {}), ...years.map((y) => el("th", { className: "num" }, "'" + y.slice(2))))));
+  const tbody = el("tbody");
+  for (const x of top) {
+    const name = label(key, dim.values[x]);
+    const tr = el("tr", {}, el("th", { className: "rowh", title: name }, name));
+    for (const y of years) {
+      const b = perYear.get(y), c = b.counts.get(x) || 0, share = c / b.total;
+      const step = Math.min(RAMP.length - 1, Math.round(Math.sqrt(share) * (RAMP.length - 1)));
+      const bg = c ? RAMP[dark ? RAMP.length - 1 - step : step] : "transparent";
+      const lightText = dark ? step < 6 : step >= 7;
+      const td = el("td", { className: "cell num", style: `background:${bg};color:${c ? (lightText ? "#fff" : "#0b0b0b") : "var(--muted)"}` },
+        c ? (share < 0.005 ? "<1" : Math.round(share * 100)) : "·");
+      td.addEventListener("pointermove", (ev) => showTip(ev, `${name} · ${y}`,
+        [["Share", pct(c, b.total)], ["Topics", `${n(c)} of ${n(b.total)}`]]));
+      td.addEventListener("pointerleave", hideTip);
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  box.append(table);
+}
+
+function renderCats(rows) {
+  const cv = DIM.category.values, cc = D.columns.category, st = D.columns.state;
+  const cats = new Map();
+  for (const i of rows) {
+    const c = cc[i];
+    let b = cats.get(c);
+    if (!b) cats.set(c, b = { total: 0, ok: 0, skip: 0, pending: 0, reasons: new Map() });
+    const s = DIM.state.values[st[i]], o = outcome(s);
+    b.total++; b[o]++;
+    if (o === "skip") b.reasons.set(s, (b.reasons.get(s) || 0) + 1);
+  }
+  const list = [...cats].map(([c, b]) => {
+    const processed = b.ok + b.skip;
+    const top = [...b.reasons].sort((a, b2) => b2[1] - a[1])[0];
+    return { c, name: cv[c], ...b, okShare: processed ? b.ok / processed : 0, top };
+  });
+  const sorters = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    total: (a, b) => a.total - b.total,
+    okShare: (a, b) => a.okShare - b.okShare,
+    skip: (a, b) => a.skip - b.skip,
+    pending: (a, b) => a.pending - b.pending,
+  };
+  list.sort((a, b) => catSort.dir * sorters[catSort.key](a, b));
+  const sel = filters.get("category");
+  const th = (key, text, cls) => el("th", { className: cls || "", onclick: () => {
+    catSort = { key, dir: catSort.key === key ? -catSort.dir : (key === "name" ? 1 : -1) }; update();
+  } }, text, catSort.key === key ? (catSort.dir > 0 ? " ▲" : " ▼") : "");
+  const table = el("table", {},
+    el("thead", {}, el("tr", {}, th("name", "Category"), th("total", "Topics", "r"), th("okShare", "Parsed %", "r"),
+      th("skip", "Skipped", "r"), th("pending", "Pending", "r"), el("th", {}, "Outcome"), el("th", {}, "Top skip reason"))));
+  const tbody = el("tbody");
+  for (const r of list) {
+    const tr = el("tr", { className: "click" + (sel && sel.has(r.c) ? " sel" : ""), onclick: () => toggle("category", r.c) },
+      el("td", {}, r.name),
+      el("td", { className: "r num" }, n(r.total)),
+      el("td", { className: "r num" }, pct(r.ok, r.ok + r.skip)),
+      el("td", { className: "r num" }, n(r.skip)),
+      el("td", { className: "r num" }, n(r.pending)),
+      el("td", {}, el("div", { className: "mini" },
+        ...[["ok", "var(--ok)"], ["skip", "var(--skip)"], ["pending", "var(--pending)"]]
+          .filter(([k]) => r[k]).map(([k, c]) => el("i", { style: `--c:${c};flex:${r[k]}` })))),
+      el("td", { className: "muted" }, r.top ? `${prettyState(r.top[0])} (${n(r.top[1])})` : "—"));
+    tr.addEventListener("pointermove", (ev) => showTip(ev, r.name, [
+      ["Parsed", `${n(r.ok)} · ${pct(r.ok, r.total)}`, "var(--ok)"],
+      ["Skipped", `${n(r.skip)} · ${pct(r.skip, r.total)}`, "var(--skip)"],
+      ["Pending", `${n(r.pending)} · ${pct(r.pending, r.total)}`, "var(--pending)"],
+    ]));
+    tr.addEventListener("pointerleave", hideTip);
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  document.getElementById("cats").replaceChildren(table);
+}
+
+function renderFacets(rowsFor) {
+  const box = document.getElementById("facets");
+  box.replaceChildren();
+  for (const dim of D.dims) {
+    if (OWN_CHART_DIMS.has(dim.key)) continue;
+    const col = D.columns[dim.key];
+    const counts = new Array(dim.values.length).fill(0);
+    let withValue = 0;
+    for (const i of rowsFor(dim.key)) {
+      const v = col[i];
+      if (v == null) continue;
+      withValue++;
+      if (dim.multi) for (const x of v) counts[x]++;
+      else counts[v]++;
+    }
+    const sel = filters.get(dim.key);
+    const order = counts.map((c, i) => i).filter((i) => counts[i] || (sel && sel.has(i)))
+      .sort((a, b) => counts[b] - counts[a]);
+    const open = expanded.has(dim.key);
+    const shown = order.slice(0, open ? FACET_MAX : FACET_TOP);
+    if (sel) for (const i of sel) if (!shown.includes(i)) shown.push(i);
+    const max = Math.max(1, ...shown.map((i) => counts[i]));
+    const card = el("section", { className: "card facet" + (sel ? " filtered" : "") },
+      el("h2", {}, dim.label, el("small", { className: "num" }, `${n(withValue)} topics${dim.multi ? " · multi" : ""}`)));
+    if (!withValue && !sel) card.append(el("div", { className: "muted" }, "Not applicable to the current filter."));
+    for (const i of shown) {
+      const isSel = sel && sel.has(i);
+      const name = label(dim.key, dim.values[i]);
+      card.append(el("button", { className: "fbar" + (isSel ? " sel" : ""), title: name, "aria-pressed": !!isSel,
+        onclick: () => toggle(dim.key, i) },
+        el("span", { className: "check" }, isSel ? "✓" : ""),
+        el("span", { className: "name", style: `--w:${(100 * counts[i] / max).toFixed(1)}%` }, name || "(empty)"),
+        el("span", { className: "pct num" }, pct(counts[i], withValue)),
+        el("span", { className: "cnt num" }, n(counts[i]))));
+    }
+    if (order.length > FACET_TOP) {
+      card.append(el("button", { className: "more", onclick: () => {
+        if (open) expanded.delete(dim.key); else expanded.add(dim.key);
+        update();
+      } }, open ? "Show less" : `Show all ${n(Math.min(order.length, FACET_MAX))}${order.length > FACET_MAX ? ` of ${n(order.length)}` : ""}`));
+    }
+    box.append(card);
+  }
+}
+
+function cellText(key, i) {
+  const v = D.columns[key][i];
+  if (v == null) return "";
+  const vals = DIM[key].values;
+  return DIM[key].multi ? v.map((x) => label(key, vals[x])).join(", ") : label(key, vals[v]);
+}
+
+function renderList(rows) {
+  document.getElementById("list-title").textContent =
+    rows.length > LIST_LIMIT ? `Topics (first ${LIST_LIMIT} of ${n(rows.length)}, newest first)` : `Topics (${n(rows.length)})`;
+  const cols = [["year", "Year"], ["category", "Category"], ["state", "Result"], ["quality", "Quality"],
+                ["resolution", "Res."], ["audio_lang", "Audio"], ["warnings", "Warnings"]];
+  const table = el("table", {}, el("thead", {}, el("tr", {}, el("th", {}, "Topic"), ...cols.map(([, t]) => el("th", {}, t)))));
+  const tbody = el("tbody");
+  for (const i of rows.slice(0, LIST_LIMIT)) {
+    const id = D.ids[i];
+    tbody.append(el("tr", {},
+      el("td", { style: "white-space:normal;min-width:280px" },
+        el("a", { href: `https://toloka.to/t${id}`, target: "_blank", rel: "noopener" }, names[i] || `t${id}`)),
+      ...cols.map(([k]) => el("td", { className: k === "warnings" || k === "category" ? "muted" : "" }, cellText(k, i)))));
+  }
+  table.append(tbody);
+  document.getElementById("list").replaceChildren(table);
+}
+
+function downloadCsv() {
+  const { matched } = computeSets();
+  const esc = (s) => /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const keys = D.dims.map((d) => d.key);
+  const lines = [["id", "name", ...keys].join(",")];
+  for (const i of matched) lines.push([D.ids[i], esc(names[i] || ""), ...keys.map((k) => esc(cellText(k, i)))].join(","));
+  const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+  el("a", { href: url, download: "toloka-parse-stats.csv" }).click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function update() {
+  const { matched, rowsFor } = computeSets();
+  renderChips();
+  renderKpis(matched);
+  renderYears(rowsFor("year"));
+  renderTrend(rowsFor("year"));
+  renderCats(rowsFor("category"));
+  renderFacets(rowsFor);
+  renderList(matched);
+  writeHash();
+}
+
+// ---------- boot ----------
+
+async function boot() {
+  const status = document.getElementById("status");
+  try {
+    const res = await fetch(location.pathname.replace(/\/$/, "") + "/data");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    D = await res.json();
+  } catch (e) {
+    status.textContent = "Failed to load stats: " + e.message;
+    return;
+  }
+  N = D.count;
+  DIM = Object.fromEntries(D.dims.map((d) => [d.key, d]));
+  names = D.names;
+  const yearNums = DIM.year.values.map(Number);
+  ALL_YEARS = [];
+  for (let y = Math.min(...yearNums); y <= Math.max(...yearNums); y++) ALL_YEARS.push(String(y));
+  namesLower = names.map((s) => (s || "").toLowerCase());
+  document.getElementById("meta").textContent =
+    `${n(N)} toloka topics · parser v${D.parser_version} · data from ${new Date(D.generated_at).toLocaleString()}`;
+
+  const trendSel = document.getElementById("trend-dim");
+  for (const d of D.dims) if (d.key !== "year") trendSel.append(el("option", { value: d.key }, d.label));
+  trendSel.addEventListener("change", () => { trendDim = trendSel.value; update(); });
+
+  for (const b of document.querySelectorAll("#yr-mode button")) {
+    b.addEventListener("click", () => {
+      yearMode = b.dataset.mode;
+      for (const o of document.querySelectorAll("#yr-mode button")) o.setAttribute("aria-pressed", o === b);
+      update();
+    });
+  }
+  let t;
+  document.getElementById("search").addEventListener("input", (ev) => {
+    clearTimeout(t);
+    t = setTimeout(() => { search = ev.target.value.trim().toLowerCase(); update(); }, 200);
+  });
+  document.getElementById("clear").addEventListener("click", () => {
+    filters.clear(); search = ""; document.getElementById("search").value = ""; update();
+  });
+  document.getElementById("csv").addEventListener("click", downloadCsv);
+  addEventListener("hashchange", () => { readHash(); update(); });
+  let rt;
+  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(update, 150); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
+
+  status.hidden = true;
+  document.getElementById("app").hidden = false;
+  readHash();
+  update();
+}
+boot();
+</script>
+</body>
+</html>
