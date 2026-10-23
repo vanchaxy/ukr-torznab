@@ -316,6 +316,8 @@ async def get_stats_rows(conn: AsyncConnection):
             topic.c.category,
             topic.c.added_on,
             page.c.id.is_not(None).label("downloaded"),
+            page.c.html.is_not(None).label("has_html"),
+            _observed_recently().label("observed"),
             release.c.id.label("release_id"),
             release.c.result,
             release.c.parser_version,
