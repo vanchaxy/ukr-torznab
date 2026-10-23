@@ -206,10 +206,16 @@ def detect_author(dom) -> str | None:
     return _AUTHOR_DISALLOWED.sub("", author_raw) or None
 
 
+# Normalised with decancer so mixed-script spellings ("yкраїнська" with a Latin y) still match.
+_LANG_MAP_NORMALISED = [(str(decancer_parse(k)), v) for k, v in LANG_MAP.items()]
+# A character followed by U+0336 (combining long stroke overlay) is crossed out.
+_STRUCK_OUT_RE = re.compile(".̶")
+
+
 def _detect_single_lang(text: str) -> Lang:
-    text_lower = text.lower()
-    for substr, lang in LANG_MAP.items():
-        if substr.lower() in text_lower:
+    normalised = str(decancer_parse(_STRUCK_OUT_RE.sub("", text)))
+    for substr, lang in _LANG_MAP_NORMALISED:
+        if substr in normalised:
             return lang
     return Lang.UNKNOWN
 
