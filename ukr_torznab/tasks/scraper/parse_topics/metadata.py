@@ -23,7 +23,6 @@ from ukr_torznab.tasks.scraper.parse_topics.mappings import (
 )
 from ukr_torznab.utils import clean_string
 
-
 # x264/x265 traces in MediaInfo or encode logs mean the video was re-encoded.
 _ENCODER_RE = re.compile(r"\bx26[45]\b|encoding settings|бібліотека кодування")
 _MEDIAINFO_RE = re.compile(r"writing library|бібліотека запису|complete name|повна назва")

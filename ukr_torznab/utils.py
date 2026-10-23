@@ -58,7 +58,7 @@ def positional_numbers(names: list[str]) -> dict[str, int] | None:
     if len(names) <= 1:
         return None
     all_nums = [re.findall(r"\d+", name) for name in names]
-    if len(set(len(nums) for nums in all_nums)) != 1:
+    if len({len(nums) for nums in all_nums}) != 1:
         return None
     for col in range(len(all_nums[0])):
         vals = [int(nums[col]) for nums in all_nums]

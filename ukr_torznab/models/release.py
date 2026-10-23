@@ -1,10 +1,10 @@
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from collections.abc import Callable
-from typing import Any, TypeVar, overload
+from typing import Any, overload
 
 from ukr_torznab.models.aspect_ratio import AspectRatio
 from ukr_torznab.models.audio_source import AudioSource
@@ -16,8 +16,6 @@ from ukr_torznab.models.quality import Quality
 from ukr_torznab.models.resolution import Resolution
 from ukr_torznab.models.tracker import Tracker
 from ukr_torznab.models.video_format import VideoFormat
-
-_E = TypeVar("_E", bound=Enum)
 
 _UNSAFE_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -38,10 +36,10 @@ def _decode_json(raw):
 
 
 @overload
-def enum_from_value(cls: type[_E], v, *, default: _E) -> _E: ...
+def enum_from_value[E: Enum](cls: type[E], v, *, default: E) -> E: ...
 @overload
-def enum_from_value(cls: type[_E], v, *, default: None = None) -> _E | None: ...
-def enum_from_value(cls: type[_E], v, *, default: _E | None = None) -> _E | None:
+def enum_from_value[E: Enum](cls: type[E], v, *, default: None = None) -> E | None: ...
+def enum_from_value[E: Enum](cls: type[E], v, *, default: E | None = None) -> E | None:
     if v is None or v == "":
         return default
     try:
@@ -50,11 +48,11 @@ def enum_from_value(cls: type[_E], v, *, default: _E | None = None) -> _E | None
         return default
 
 
-def _parse_enum_list(raw, convert: Callable[[Any], _E]) -> list[_E]:
+def _parse_enum_list[E: Enum](raw, convert: Callable[[Any], E]) -> list[E]:
     decoded = _decode_json(raw)
     if not isinstance(decoded, list):
         return []
-    out: list[_E] = []
+    out: list[E] = []
     for v in decoded:
         try:
             out.append(convert(v))

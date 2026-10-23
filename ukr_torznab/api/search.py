@@ -17,7 +17,6 @@ from ukr_torznab.models import (
 )
 from ukr_torznab.models.codec_family import CODEC_MAP
 
-
 SEARCH_FUNCTIONS = ("search", "tvsearch", "movie")
 
 

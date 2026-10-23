@@ -5,7 +5,6 @@ import httpx
 from httpx_limiter import Rate
 
 from ukr_torznab.clients._http import make_client
-
 from ukr_torznab.clients.utp.parser import (
     parse_audio_tracks,
     parse_mediainfo,
@@ -147,7 +146,7 @@ def transform_utp_item(item: dict) -> Release:
     created_at_str = attrs.get("created_at")
     if created_at_str:
         try:
-            registered_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+            registered_at = datetime.fromisoformat(created_at_str)
         except (ValueError, AttributeError):
             pass
 
