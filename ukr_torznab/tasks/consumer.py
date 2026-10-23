@@ -27,6 +27,8 @@ def _coerce_row(table: sa.Table, row: dict) -> dict:
                 result[col.name] = val
             else:
                 result[col.name] = str(val).lower() in ("t", "true", "1")
+        elif isinstance(col.type, sa.Integer):
+            result[col.name] = int(val)
         elif isinstance(col.type, sa.Date):
             result[col.name] = date.fromisoformat(val)
         elif isinstance(col.type, sa.DateTime):
@@ -148,6 +150,6 @@ class ElectricConsumerTask(AbstractTask):
                     self.table.update().where(pk_col == pk_val).values(update_data),
                 )
         elif operation == "delete":
-            pk_val = value.get(pk_col.name)
+            pk_val = _coerce_row(self.table, value).get(pk_col.name)
             if pk_val is not None:
                 await conn.execute(delete(self.table).where(pk_col == pk_val))
