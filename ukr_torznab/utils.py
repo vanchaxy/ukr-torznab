@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timezone
 from zoneinfo import ZoneInfo
 
 from decancer_py import parse as decancer_parse
@@ -19,6 +19,14 @@ OTHER_EXTENSIONS: frozenset[str] = frozenset({".ttf", ".ifo", ".bup", ".txt", ".
 ALLOWED_EXTENSIONS: frozenset[str] = (
     VIDEO_EXTENSIONS | AUDIO_EXTENSIONS | SUB_EXTENSIONS | IMAGE_EXTENSIONS | OTHER_EXTENSIONS
 )
+
+
+def toloka_display_tz() -> timezone:
+    """Toloka renders every timestamp with Kyiv's *current* UTC offset, not the offset in effect
+    on that date, so all displayed times move by an hour at each DST switch."""
+    offset = datetime.now(KYIV_TZ).utcoffset()
+    assert offset is not None
+    return timezone(offset)
 
 
 def is_video(path: str) -> bool:

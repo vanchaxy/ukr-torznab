@@ -9,7 +9,7 @@ from lxml.etree import _Element
 
 from ukr_torznab.clients._http import BROWSER_HEADERS, make_client
 from ukr_torznab.settings import TOLOKA_CATEGORIES
-from ukr_torznab.utils import KYIV_TZ
+from ukr_torznab.utils import toloka_display_tz
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,7 @@ class TolokaClient:
             ),
         )
 
+        display_tz = toloka_display_tz()
         topics = []
         for topic_tr in topics_table:
             _, name_td, stats_td, size_td, added_on_td, updated_at_td = list(topic_tr)
@@ -121,7 +122,7 @@ class TolokaClient:
             updated_at_str = _xp(updated_at_td, './/span[@class="postdetails"]')[0].text
             updated_at = (
                 datetime.strptime(updated_at_str, "%Y-%m-%d %H:%M")
-                .replace(tzinfo=KYIV_TZ)
+                .replace(tzinfo=display_tz)
                 .astimezone()
             )
 
