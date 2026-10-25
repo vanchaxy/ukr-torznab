@@ -55,6 +55,7 @@ class ElectricConsumerTask(AbstractTask):
         self.electric_url = electric_url.rstrip("/")
         self.table = table
         self.shape_name = table.name
+        self.cursor: str | None = None
 
     async def run_once(self):
         async with self.engine.begin() as conn:
@@ -72,6 +73,8 @@ class ElectricConsumerTask(AbstractTask):
             params["handle"] = current_handle
         if current_offset != "-1":
             params["live"] = "true"
+            if self.cursor:
+                params["cursor"] = self.cursor
 
         try:
             response = await self.client.get(
@@ -107,6 +110,7 @@ class ElectricConsumerTask(AbstractTask):
 
         new_handle = response.headers.get("electric-handle", current_handle)
         new_offset = response.headers.get("electric-offset", current_offset)
+        self.cursor = response.headers.get("electric-cursor", self.cursor)
         messages: list[dict] = response.json()
 
         async with self.engine.begin() as conn:

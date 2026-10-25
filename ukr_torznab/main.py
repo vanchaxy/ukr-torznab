@@ -9,6 +9,7 @@ import httpx
 import uvicorn
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ukr_torznab import __version__
 from ukr_torznab.api import app as api_app
 from ukr_torznab.clients.toloka import TolokaClient
 from ukr_torznab.db.tables import release, topic
@@ -82,7 +83,9 @@ async def main():
             logger.info("Starting in consumer mode (ELECTRIC_URL=%s)", ELECTRIC_URL)
             from ukr_torznab.tasks.consumer import ElectricConsumerTask
 
-            electric_client = httpx.AsyncClient()
+            electric_client = httpx.AsyncClient(
+                headers={"User-Agent": f"ukr-torznab/{__version__}"},
+            )
             stack.push_async_callback(electric_client.aclose)
             for table in (topic, release):
                 tasks.append(
