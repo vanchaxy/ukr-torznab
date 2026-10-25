@@ -39,7 +39,7 @@ from ukr_torznab.tasks.scraper.parse_topics.metadata import (
 )
 from ukr_torznab.tasks.scraper.parse_topics.models import ParsedPage, SkippedPage, SkipReason
 from ukr_torznab.tasks.scraper.parse_topics.season import detect_season
-from ukr_torznab.utils import ALLOWED_EXTENSIONS, EPOCH, KYIV_TZ, VIDEO_EXTENSIONS
+from ukr_torznab.utils import ALLOWED_EXTENSIONS, EPOCH, VIDEO_EXTENSIONS, toloka_display_tz
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +74,11 @@ async def process_single_page(
         .strip()
     )
     if raw_reg:
-        kyiv_dt = datetime.strptime(raw_reg, "%Y-%m-%d %H:%M").replace(tzinfo=KYIV_TZ)
-        registered_at = kyiv_dt.astimezone(UTC)
+        registered_at = (
+            datetime.strptime(raw_reg, "%Y-%m-%d %H:%M")
+            .replace(tzinfo=toloka_display_tz(page.downloaded_at))
+            .astimezone(UTC)
+        )
     else:
         registered_at = EPOCH
 

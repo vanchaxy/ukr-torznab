@@ -11,7 +11,7 @@ from ukr_torznab.db.tables import page, release, topic
 from ukr_torznab.db.upsert import upsert
 from ukr_torznab.models import Release
 
-PARSER_VERSION = 11
+PARSER_VERSION = 12
 
 # Torznab search only returns topics seen on the tracker this recently.
 SEARCH_WINDOW = timedelta(days=2)

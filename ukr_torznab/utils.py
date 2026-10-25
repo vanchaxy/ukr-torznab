@@ -22,10 +22,12 @@ ALLOWED_EXTENSIONS: frozenset[str] = (
 )
 
 
-def toloka_display_tz() -> timezone:
-    """Toloka renders every timestamp with Kyiv's *current* UTC offset, not the offset in effect
-    on that date, so all displayed times move by an hour at each DST switch."""
-    return timezone(cast("timedelta", datetime.now(KYIV_TZ).utcoffset()))
+def toloka_display_tz(at: datetime | None = None) -> timezone:
+    """Toloka renders every timestamp with Kyiv's UTC offset at render time, not the offset in
+    effect on that date, so all displayed times move by an hour at each DST switch.
+
+    `at` is when the HTML was fetched (defaults to now)."""
+    return timezone(cast("timedelta", (at or datetime.now()).astimezone(KYIV_TZ).utcoffset()))
 
 
 def is_video(path: str) -> bool:
