@@ -131,6 +131,13 @@ def transform_utp_item(item: dict) -> Release:
         is_tv,
     )
 
+    # TV names rarely carry the series year (a year after SxxEyy is the air year), so a bare
+    # "Dark Matter" fits two shows and Sonarr refuses to import it. release_year is the
+    # first-air year: add it the way TVDB titles tell such shows apart.
+    title = release["title"]
+    if is_tv and attrs.get("release_year"):
+        title = f"{title} ({attrs['release_year']})"
+
     audio_types: list[AudioType] = []
     audio_sources: list[AudioSource] = []
     audio_langs: list[Lang] = []
@@ -154,7 +161,7 @@ def transform_utp_item(item: dict) -> Release:
         id=int(item["id"]),
         tracker=Tracker.utopia,
         name=attrs["name"],
-        title=release["title"],
+        title=title,
         year=release["year"],
         content_type=ContentType.TV if is_tv else ContentType.MOVIE,
         season=release["season"],
