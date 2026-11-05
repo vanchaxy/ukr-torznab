@@ -4,7 +4,7 @@ from datetime import datetime
 
 from openai import AsyncOpenAI
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from ukr_torznab.clients.servarr import ServarrClient
 from ukr_torznab.clients.skyhook import SkyhookClient
@@ -46,69 +46,75 @@ class ParseTopicsTask(AbstractTask):
             logger.info("imdb_titles table is ready (%d rows)", imdb_count)
             self._imdb_ready = True
 
-        async with self.engine.begin() as conn:
+        async with self.engine.connect() as conn:
             rows = await get_page_to_parse(conn)
-            if not rows:
-                logger.info("No pages to parse, sleeping")
-                await self.interruptible_sleep(60)
+        if not rows:
+            logger.info("No pages to parse, sleeping")
+            await self.interruptible_sleep(60)
+            return
+
+        logger.info("Parsing %d pages", len(rows))
+        for row in rows:
+            if not self.running:
                 return
+            # One transaction per page: a batch-wide one stays open across hundreds of
+            # metadata requests, and the SQLite write-ahead log grows until it commits.
+            async with self.engine.begin() as conn:
+                await self._parse_row(conn, row)
 
-            logger.info("Parsing %d pages", len(rows))
-            for row in rows:
-                if not self.running:
-                    return
-                cached_hash = row.video_files_hash
-                cached_fte = None
-                if row.file_to_episode:
-                    cached_fte = {k: tuple(v) for k, v in json.loads(row.file_to_episode).items()}
-                cached_sc = row.season_complete
+    async def _parse_row(self, conn: AsyncConnection, row) -> None:
+        cached_hash = row.video_files_hash
+        cached_fte = None
+        if row.file_to_episode:
+            cached_fte = {k: tuple(v) for k, v in json.loads(row.file_to_episode).items()}
+        cached_sc = row.season_complete
 
-                logger.info("Parsing page %s", row.id)
-                result = await process_single_page(
-                    conn,
-                    self.skyhook_client,
-                    self.servarr_client,
-                    row,
-                    cached_video_files_hash=cached_hash,
-                    cached_file_to_episode=cached_fte,
-                    cached_season_complete=cached_sc,
-                    openai_client=self.openai_client,
+        logger.info("Parsing page %s", row.id)
+        result = await process_single_page(
+            conn,
+            self.skyhook_client,
+            self.servarr_client,
+            row,
+            cached_video_files_hash=cached_hash,
+            cached_file_to_episode=cached_fte,
+            cached_season_complete=cached_sc,
+            openai_client=self.openai_client,
+        )
+
+        now = datetime.now().astimezone()
+
+        if isinstance(result, SkippedPage):
+            logger.info("Page %s skipped: %s", row.id, result.reason.name)
+            await upsert_release(
+                conn,
+                id=row.id,
+                result=result.reason.name,
+                parsed_at=now,
+                hash_changed_at=now,
+            )
+        else:
+            prev_hash = row.prev_content_hash
+            if result.content_hash != prev_hash:
+                hash_changed_at = now
+                logger.info("Page %s: content hash changed", row.id)
+            else:
+                hash_changed_at = row.prev_hash_changed_at or now
+
+            if result.season is not None:
+                logger.info(
+                    "Page %s parsed ok: %s S%02d",
+                    row.id,
+                    result.title,
+                    result.season,
                 )
+            else:
+                logger.info("Page %s parsed ok: %s (%s)", row.id, result.title, result.year)
 
-                now = datetime.now().astimezone()
-
-                if isinstance(result, SkippedPage):
-                    logger.info("Page %s skipped: %s", row.id, result.reason.name)
-                    await upsert_release(
-                        conn,
-                        id=row.id,
-                        result=result.reason.name,
-                        parsed_at=now,
-                        hash_changed_at=now,
-                    )
-                else:
-                    prev_hash = row.prev_content_hash
-                    if result.content_hash != prev_hash:
-                        hash_changed_at = now
-                        logger.info("Page %s: content hash changed", row.id)
-                    else:
-                        hash_changed_at = row.prev_hash_changed_at or now
-
-                    if result.season is not None:
-                        logger.info(
-                            "Page %s parsed ok: %s S%02d",
-                            row.id,
-                            result.title,
-                            result.season,
-                        )
-                    else:
-                        logger.info("Page %s parsed ok: %s (%s)", row.id, result.title, result.year)
-
-                    await upsert_release(
-                        conn,
-                        id=row.id,
-                        result="ok",
-                        parsed_at=now,
-                        hash_changed_at=hash_changed_at,
-                        parsed_page=result,
-                    )
+            await upsert_release(
+                conn,
+                id=row.id,
+                result="ok",
+                parsed_at=now,
+                hash_changed_at=hash_changed_at,
+                parsed_page=result,
+            )
