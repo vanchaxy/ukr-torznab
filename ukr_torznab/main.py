@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 import uvicorn
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ukr_torznab import __version__
@@ -44,6 +45,12 @@ def _run_migrations() -> None:
     command.upgrade(cfg, "head")
 
 
+def _limit_sqlite_wal(dbapi_connection, _connection_record) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_size_limit = 67108864")
+    cursor.close()
+
+
 def _configure_logging() -> None:
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -60,6 +67,9 @@ async def main():
     async with AsyncExitStack() as stack:
         engine = create_async_engine(DATABASE_URL, connect_args={"timeout": 30})
         stack.push_async_callback(engine.dispose)
+        if engine.dialect.name == "sqlite":
+            # Shrink the write-ahead log back to 64 MB each time SQLite resets it.
+            event.listen(engine.sync_engine, "connect", _limit_sqlite_wal)
 
         toloka_client = TolokaClient(username=TOLOKA_USERNAME, password=TOLOKA_PASSWORD)
         stack.push_async_callback(toloka_client.close)
