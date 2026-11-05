@@ -1,8 +1,10 @@
+import asyncio
 import logging
 import re
 from datetime import datetime
 from typing import Any, cast
 
+import httpx
 from httpx_limiter import Rate
 from lxml import etree
 from lxml.etree import _Element
@@ -30,6 +32,7 @@ class TolokaClient:
             follow_redirects=True,
             headers=BROWSER_HEADERS,
         )
+        self._login_lock = asyncio.Lock()
 
     async def login(self):
         response = await self._client.post(
@@ -44,13 +47,35 @@ class TolokaClient:
             },
         )
         response.raise_for_status()
+        if not self._logged_in(response):
+            raise RuntimeError("Toloka login failed: check TOLOKA_USERNAME and TOLOKA_PASSWORD")
+
+    @staticmethod
+    def _logged_in(response: httpx.Response) -> bool:
+        # Every page shows a logout link to a signed-in user. Without a session,
+        # topic pages hide the files and download.php answers with an HTML page.
+        return b"logout=true" in response.content
+
+    async def _get(self, url: str, **kwargs: Any) -> httpx.Response:
+        response = await self._client.get(url, **kwargs)
+        if (
+            response.is_success
+            and response.headers.get("content-type", "").startswith("text/html")
+            and not self._logged_in(response)
+        ):
+            # Concurrent callers may each log in again; rare and harmless.
+            async with self._login_lock:
+                logger.info("Toloka session expired, logging in again")
+                await self.login()
+            response = await self._client.get(url, **kwargs)
+        response.raise_for_status()
+        return response
 
     async def get_recent_categories(self):
         params = [("f[]", x) for x in TOLOKA_CATEGORIES]
         cats = []
         for sort in (0, 8):
-            response = await self._client.get("tracker.php", params=params + [("o", sort)])
-            response.raise_for_status()
+            response = await self._get("tracker.php", params=params + [("o", sort)])
             dom = etree.HTML(response.text)
             cats.extend(
                 [
@@ -65,11 +90,10 @@ class TolokaClient:
         return list(set(cats))
 
     async def get_category_page_topics(self, category_id, page_num, *, sort=0):
-        response = await self._client.get(
+        response = await self._get(
             f"f{category_id}-{page_num * PAGE_SIZE}",
             params={"sort": sort},
         )
-        response.raise_for_status()
         dom = etree.HTML(response.text)
         topics_table = cast(
             "list[_Element]",
@@ -143,8 +167,7 @@ class TolokaClient:
         return topics
 
     async def download_topic(self, id):
-        response = await self._client.get(f"t{id}")
-        response.raise_for_status()
+        response = await self._get(f"t{id}")
 
         try:
             dom = etree.HTML(response.text)
@@ -161,8 +184,7 @@ class TolokaClient:
         return response.text
 
     async def download_torrent(self, id):
-        response = await self._client.get("download.php", params={"id": id})
-        response.raise_for_status()
+        response = await self._get("download.php", params={"id": id})
         if not response.content.startswith(b"d") or not response.content.endswith(b"e"):
             return None
         return response.content

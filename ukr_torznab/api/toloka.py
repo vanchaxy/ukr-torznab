@@ -1,5 +1,7 @@
+import logging
 from typing import Annotated
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -9,6 +11,8 @@ from ukr_torznab.api.info import toloka_topic_info
 from ukr_torznab.api.search import SEARCH_FUNCTIONS, SearchParams, build_rss, search_params
 from ukr_torznab.api.xml import error_xml
 from ukr_torznab.db.queries import get_topic_info, search_releases
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/toloka")
 
@@ -46,7 +50,11 @@ async def torznab_api(
 
 @router.get("/download/{download_id}")
 async def download_torrent(request: Request, download_id: int) -> Response:
-    torrent_data = await request.app.state.toloka_client.download_torrent(download_id)
+    try:
+        torrent_data = await request.app.state.toloka_client.download_torrent(download_id)
+    except httpx.HTTPError as e:
+        logger.warning("Torrent %s: download from Toloka failed: %r", download_id, e)
+        torrent_data = None
     if not torrent_data:
         raise HTTPException(status_code=502, detail="Failed to fetch torrent from Toloka")
 
