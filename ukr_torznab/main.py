@@ -26,6 +26,8 @@ from ukr_torznab.settings import (
     TOLOKA_PASSWORD,
     TOLOKA_USERNAME,
     UTP_API_KEY,
+    ZERODAY_PASSWORD,
+    ZERODAY_USERNAME,
 )
 from ukr_torznab.tasks.base import AbstractTask
 
@@ -76,6 +78,22 @@ async def main():
             stack.push_async_callback(utp_client.close)
             logger.info("UTP client enabled")
         api_app.state.utp_client = utp_client
+
+        zeroday_client = None
+        if ZERODAY_USERNAME and ZERODAY_PASSWORD:
+            from ukr_torznab.clients.servarr import ServarrClient
+            from ukr_torznab.clients.skyhook import SkyhookClient
+            from ukr_torznab.clients.zeroday.client import ZerodayClient
+
+            zeroday_client = ZerodayClient(ZERODAY_USERNAME, ZERODAY_PASSWORD)
+            stack.push_async_callback(zeroday_client.close)
+            # Title lookups for id searches; 0day itself only searches by text.
+            api_app.state.servarr_client = ServarrClient()
+            stack.push_async_callback(api_app.state.servarr_client.close)
+            api_app.state.skyhook_client = SkyhookClient()
+            stack.push_async_callback(api_app.state.skyhook_client.close)
+            logger.info("0day client enabled")
+        api_app.state.zeroday_client = zeroday_client
 
         tasks: list[AbstractTask] = []
 
