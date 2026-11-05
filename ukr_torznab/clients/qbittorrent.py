@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 from httpx_limiter import Rate
 
@@ -14,17 +16,31 @@ class QBittorrentClient:
             timeout=30,
         )
 
-    async def _get(self, path: str, **params: str) -> httpx.Response:
-        resp = await self._client.get(path, params=params)
+    async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        resp = await self._client.request(method, path, **kwargs)
+        if resp.status_code == 403:
+            # Not logged in yet, or the WebUI session expired.
+            await self.login()
+            resp = await self._client.request(method, path, **kwargs)
         resp.raise_for_status()
         return resp
 
+    async def _get(self, path: str, **params: str) -> httpx.Response:
+        return await self._request("GET", path, params=params)
+
     async def _post(self, path: str, **data: str) -> None:
-        resp = await self._client.post(path, data=data)
-        resp.raise_for_status()
+        await self._request("POST", path, data=data)
 
     async def login(self) -> None:
-        await self._post("auth/login", username=self._username, password=self._password)
+        resp = await self._client.post(
+            "auth/login",
+            data={"username": self._username, "password": self._password},
+        )
+        resp.raise_for_status()
+        # qBittorrent 5 answers a login with 204 and no body, older versions "Ok.";
+        # wrong credentials get 200 "Fails."
+        if resp.text not in ("", "Ok."):
+            raise RuntimeError("qBittorrent login failed: check the qBittorrent credentials")
 
     async def get_stopped_torrents(
         self,

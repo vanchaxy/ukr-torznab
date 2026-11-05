@@ -142,7 +142,6 @@ async def main():
                 QBITTORRENT_PASSWORD,
             )
             stack.push_async_callback(qbt_client.close)
-            await qbt_client.login()
             tasks.append(
                 RenameTorrentsTask(engine=engine, qbt_client=qbt_client, utp_client=utp_client),
             )
