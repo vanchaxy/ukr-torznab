@@ -7,6 +7,9 @@ OPENAI_API_KEY: str | None = os.environ.get("OPENAI_API_KEY")
 
 UTP_API_KEY: str | None = os.environ.get("UTP_API_KEY")
 
+ZERODAY_USERNAME: str | None = os.environ.get("ZERODAY_USERNAME")
+ZERODAY_PASSWORD: str | None = os.environ.get("ZERODAY_PASSWORD")
+
 # Consumer mode by default; set ELECTRIC_URL to an empty string to run the scraper instead.
 ELECTRIC_URL: str = os.environ.get("ELECTRIC_URL", "https://electric.vnchx.com")
 
