@@ -37,11 +37,12 @@ def _download_volume_factor(freeleech) -> str:
 
 class UtpClient:
     def __init__(self, api_key: str) -> None:
-        self._api_key = api_key
+        # The token goes in a header, not the query string: httpx logs every request URL.
         self._client = make_client(
             "https://utp.to/api/torrents",
             rate=Rate.create(1, 1),
             timeout=30,
+            headers={"Authorization": f"Bearer {api_key}"},
         )
 
     async def search(
@@ -58,7 +59,6 @@ class UtpClient:
         page: int = 1,
     ) -> list[Release]:
         params: dict[str, str] = {
-            "api_token": self._api_key,
             "perPage": str(per_page),
             "page": str(page),
         }
@@ -108,7 +108,7 @@ class UtpClient:
     async def get_item(self, torrent_id: str) -> dict | None:
         """The raw API item, for callers that need more than the parsed `Release`."""
         try:
-            resp = await self._client.get(f"/{torrent_id}", params={"api_token": self._api_key})
+            resp = await self._client.get(f"/{torrent_id}")
             resp.raise_for_status()
             return resp.json()
         except httpx.HTTPError:
